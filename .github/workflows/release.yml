@@ -19,6 +19,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
+      - name: Check release App configuration
+        id: configuration
+        env:
+          HAS_RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID != '' }}
+          HAS_RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [[ "$HAS_RELEASE_APP_ID" == 'true' && "$HAS_RELEASE_APP_PRIVATE_KEY" == 'true' ]]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo 'Release App configuration is missing. Set RELEASE_APP_ID and RELEASE_APP_PRIVATE_KEY to enable release PR creation.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Checkout release history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,7 +57,7 @@ jobs:
             echo 'No addon changes since the latest release; no release PR is needed.' >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Create release GitHub App token
-        if: steps.eligibility.outputs.eligible == 'true'
+        if: steps.eligibility.outputs.eligible == 'true' && steps.configuration.outputs.configured == 'true'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v2.2.1
         with:
@@ -55,7 +68,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
       - name: Create or update the release pull request
-        if: steps.eligibility.outputs.eligible == 'true'
+        if: steps.eligibility.outputs.eligible == 'true' && steps.configuration.outputs.configured == 'true'
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v4.4.0
         with:
           token: ${{ steps.app-token.outputs.token }}
