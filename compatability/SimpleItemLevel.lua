@@ -254,7 +254,19 @@ end
 local function Invalidate(button)
     if not enabled then return end
     Clear(button)
-    if enabled then Schedule(button) end
+    local scope, root = Scope(button)
+    local bag = Location(button)
+    if scope and Usable(button, scope, root, bag) then Schedule(button) end
+end
+
+local function ButtonChanged(button)
+    if not enabled then return end
+    local state = buttons[button]
+    if state and state.current then
+        local ok, current = pcall(state.current)
+        if ok and current then return end
+    end
+    Invalidate(button)
 end
 
 local function HookMethod(object, record, method, callback)
@@ -331,7 +343,7 @@ local function HookButton(button)
         button:HookScript("OnShow", function() if enabled then Schedule(button) end end)
     end
     for _, method in ipairs({"SetID", "SetParent", "SetItemButtonTexture", "SetItemButtonQuality"}) do
-        HookMethod(button, state.hooks, method, Invalidate)
+        HookMethod(button, state.hooks, method, ButtonChanged)
     end
     local parent = button:GetParent()
     if parent then
@@ -343,7 +355,7 @@ local function HookButton(button)
         record.buttons[button] = true
         HookMethod(parent, record, "SetID", function(self)
             for child in pairs(record.buttons) do
-                if child:GetParent() == self then Invalidate(child) end
+                if child:GetParent() == self then ButtonChanged(child) end
             end
         end)
     end
@@ -421,7 +433,8 @@ UpdateButton = function(button)
     local info = C_Container.GetContainerItemInfo(bag, slot)
     local link = C_Container.GetContainerItemLink(bag, slot)
     if not (info and info.itemID and link) then return end
-    local expectedID, token, expectedGeneration = info.itemID, state.token, generation
+    local expectedID, expectedQuality = info.itemID, info.quality
+    local expectedParent, token, expectedGeneration = button:GetParent(), state.token, generation
     state.itemID = expectedID
     local indexed = itemButtons[expectedID]
     if not indexed then indexed = WeakKeys(); itemButtons[expectedID] = indexed end
@@ -430,12 +443,14 @@ UpdateButton = function(button)
         if state.token ~= token or generation ~= expectedGeneration then return false end
         if type(_G.SimpleItemLevelDB) ~= "table" or not SameSettings(settings)
             or API() ~= api or not settings.bags then return false end
+        if button:GetParent() ~= expectedParent then return false end
         local currentScope, currentRoot = Scope(button)
         if currentScope ~= scope or currentRoot ~= root or not Usable(button, scope, root, bag) then return false end
         local currentBag, currentSlot = Location(button)
         if currentBag ~= bag or currentSlot ~= slot then return false end
         local current = C_Container.GetContainerItemInfo(bag, slot)
-        return current and current.itemID == expectedID and C_Container.GetContainerItemLink(bag, slot) == link
+        return current and current.itemID == expectedID and current.quality == expectedQuality
+            and C_Container.GetContainerItemLink(bag, slot) == link
     end
     state.current = Valid
     local function Callback(callback)
@@ -558,8 +573,11 @@ Refresh = function()
     end
     if not globalQualityHook and type(_G.SetItemButtonQuality) == "function" then
         hooksecurefunc("SetItemButtonQuality", function(button)
-            if enabled and button and Scope(button) then
-                if buttons[button] then Invalidate(button) else Schedule() end
+            if enabled and button then
+                local scope, root = Scope(button)
+                if not scope then return end
+                if buttons[button] then ButtonChanged(button)
+                elseif Usable(button, scope, root, Location(button)) then Schedule(scope) end
             end
         end)
         globalQualityHook = true

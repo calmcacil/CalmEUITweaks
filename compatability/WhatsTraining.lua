@@ -70,6 +70,11 @@ local function IsObject(value)
     return type(value) == "table" or type(value) == "userdata"
 end
 
+local function Shown(frame)
+    if frame.IsVisible then return frame:IsVisible() end
+    return not frame.IsShown or frame:IsShown()
+end
+
 local function ReadColor(text)
     if not IsObject(text) or type(text.GetTextColor) ~= "function"
         or type(text.SetTextColor) ~= "function" then return end
@@ -556,10 +561,20 @@ local function FontStyle(source)
     local font = ReadProperty(source, "Font")
     if not font then return end
     local object = ReadProperty(source, "FontObject")
+    local shadowColor, shadowOffset = ReadProperty(source, "ShadowColor"), ReadProperty(source, "ShadowOffset")
+    local function Changed()
+        if applying then return end
+        local currentFont, currentObject = ReadProperty(source, "Font"), ReadProperty(source, "FontObject")
+        local currentColor, currentOffset = ReadProperty(source, "ShadowColor"), ReadProperty(source, "ShadowOffset")
+        local same = SameProperty(font, currentFont, "Font")
+            and (object == currentObject or SameProperty(object, currentObject, "FontObject"))
+            and (shadowColor == currentColor or SameProperty(shadowColor, currentColor, "ShadowColor"))
+            and (shadowOffset == currentOffset or SameProperty(shadowOffset, currentOffset, "ShadowOffset"))
+        font, object, shadowColor, shadowOffset = currentFont, currentObject, currentColor, currentOffset
+        if not same and Enabled() then ScheduleApply() end
+    end
     for _, method in ipairs({"SetFont", "SetFontObject"}) do
-        HookMethod(source, method, function()
-            if not applying and Enabled() then ScheduleApply() end
-        end)
+        HookMethod(source, method, Changed)
     end
     return {fontPath = font[1], fontFlag = font[3], fontObject = object and object[1],
         shadowColor = ReadProperty(source, "ShadowColor"), shadowOffset = ReadProperty(source, "ShadowOffset")}
@@ -606,11 +621,7 @@ local function ResolveColors()
     HookMethod(source, "SetTextColor", function()
         if Enabled() then ScheduleApply() end
     end)
-    for _, method in ipairs({"SetFont", "SetFontObject"}) do
-        HookMethod(source, method, function()
-            if Enabled() then ScheduleApply() end
-        end)
-    end
+    FontStyle(source)
     local colors = {}
     for role, color in pairs(FALLBACK_COLORS) do colors[role] = color end
     colors.primary, colors.strong = primary, primary
@@ -781,17 +792,13 @@ local function AdaptText(text, colors, override)
 end
 
 RefreshText = function(text)
-    if not Enabled() then return end
+    if not Enabled() or not Shown(text) then return end
     if not activeColors then ScheduleApply(); return end
     local ok, err = pcall(AdaptText, text, activeColors)
     if not ok then
         ns.ReportError(KEY, err)
         SetStatus(ns.errors[KEY])
     end
-end
-
-local function Shown(frame)
-    return not frame.IsShown or frame:IsShown()
 end
 
 local function AdaptRegions(frame, colors)
@@ -1140,6 +1147,11 @@ local function Apply()
         activeColors = nil
         RestoreAll()
         SetStatus("Waiting for What's Training?")
+        return
+    end
+    local root = _G.PlayerSpellsFrame
+    if root and not Shown(root) then
+        SetStatus("Active: " .. style .. " spellbook theme")
         return
     end
     local colors = ResolveColors()

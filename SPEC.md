@@ -143,6 +143,9 @@ clean up links.
 - SimpleItemLevel controls filtering/style for labels and upgrade markers in
   EUI inventory, reagent bags and bank. Standard SIL settings changes reconcile
   the bridge; direct external database writes wait for a normal refresh.
+  Unchanged button and parent setters retain cached or pending item results.
+  Item identity, link, quality, parent, location and settings changes invalidate
+  those results. Hidden or disabled scopes do not schedule setter-driven refreshes.
 - WhatsTraining matches text and inline colors to the native spellbook's current
   text color in EUI and Modern skins, using EUI's white default before native
   controls load. It recognizes both parchment and already-dark WT text, retains
@@ -176,9 +179,10 @@ clean up links.
   class/weapon toggle is styled around its badge. Its animated glow is hidden
   through vertex alpha so the native alpha-driven animation can finish without
   scheduling per-frame theme walks. Native text/color setters update only the
-  changed label. Stable fonts and decoration layouts are cached; hidden pooled
-  rows are skipped until shown. Pooled
-  widgets are picked up on normal layout/show events. Disabling the fix or
+  changed label. Unchanged native font setters do not schedule theme passes.
+  The hidden spellbook defers theme work until shown. Stable fonts and decoration
+  layouts are cached; hidden pooled rows are skipped until shown. Pooled widgets
+  are picked up on normal layout/show events. Disabling the fix or
   spellbook skin restores owned alpha, fonts, shadows, colors and markup and
   hides created decorations, retaining later native or external writes.
 - Compatibility fixes default on. Protected restoration waits through combat.

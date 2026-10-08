@@ -529,6 +529,7 @@ local function CombatSuppression()
     h:Upgrade(true)
     overlay.protected = true
     h.combat = true
+    h.slots["0:2"].link = "item:301:b"
     a:SetItemButtonTexture("new occupant")
     check(overlay:IsShown() and not overlay.font:IsShown() and not overlay.textureRegion:IsShown(),
         "Protected own frame must fall back to independently mutable owned regions")
@@ -700,6 +701,23 @@ local function RefreshBudget()
     local main = h:Root("EUI_MainBagFrame", "RefreshInventory")
     local button = h:Button(main, 0, 1, 700)
     h.module:OnAddonLoaded("EllesmereUIBags"); h:Draw(); h:Upgrade(false)
+    for _ = 1, 20 do
+        button:SetID(button:GetID())
+        button:GetParent():SetID(0)
+        button:SetParent(button:GetParent())
+        button:SetItemButtonTexture("unchanged")
+        button:SetItemButtonQuality()
+        h.env.SetItemButtonQuality(button)
+        h:Flush()
+    end
+    check(#h.loads == 0 and #h.upgrades == 0, "Repeated unchanged setters reuse loaded item results")
+    h.slots["0:1"].quality = 3
+    button:SetItemButtonQuality(); h:Flush()
+    check(#h.loads == 1, "Changed quality requests a fresh item result")
+    button:SetID(button:GetID()); button:SetItemButtonQuality(); h:Flush()
+    check(#h.loads == 1, "Unchanged setters retain the pending item callback")
+    h:LoadItems(); h:Upgrade(false)
+    check(h.lastColorQuality == 3, "Changed item quality invalidates the cached display")
     main:RefreshInventory(); h:Flush()
     check(#h.loads == 0 and #h.upgrades == 0, "Unchanged bag refresh must not reload items or repeat upgrade queries")
     h:Draw("BAG_UPDATE_DELAYED")
@@ -713,6 +731,11 @@ local function RefreshBudget()
     local bank = h:Root("EUI_BankFrame", "RefreshBank")
     reagent.shown, bank.shown = false, false
     main:Hide(); h:Draw()
+    button:SetID(button:GetID())
+    button:GetParent():SetID(0)
+    button:SetItemButtonQuality()
+    h.env.SetItemButtonQuality(button)
+    check(#h.timers == 0, "Hidden bag setters do not schedule refresh work")
     local scans = 0
     for _, root in ipairs({main, reagent, bank}) do
         local original = root.GetChildren
