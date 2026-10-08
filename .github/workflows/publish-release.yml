@@ -1,0 +1,135 @@
+name: Publish release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag to recover, for example v0.2.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Verify and package released source
+    if: >-
+      github.repository == 'calmcacil/CalmEUITweaks' &&
+      (github.event_name == 'release' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.source.outputs.commit }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_OAUTH: ${{ github.token }}
+    steps:
+      - name: Check out trusted automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .automation
+          persist-credentials: false
+      - name: Validate published release before checkout
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          EVENT_RELEASE_ID: ${{ github.event.release.node_id }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo '::error::Expected a vX.Y.Z tag.'; exit 1; }
+          release=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,publishedAt,id)
+          jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == false and .publishedAt != null' <<< "$release" >/dev/null
+          if [[ -n "$EVENT_RELEASE_ID" ]]; then
+            [[ "$(jq -r .id <<< "$release")" == "$EVENT_RELEASE_ID" ]] || { echo '::error::Release identity changed.'; exit 1; }
+          fi
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+      - name: Check out released source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+          path: release-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify tag commit and version
+        id: source
+        working-directory: release-source
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          commit=$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")
+          [[ "$commit" == "$(git rev-parse HEAD)" ]]
+          git merge-base --is-ancestor "$commit" origin/main
+          [[ "v$(tr -d '\r\n' < VERSION)" == "$RELEASE_TAG" ]]
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Install Lua 5.1
+        run: bash .automation/scripts/install-lua.sh
+      - name: Validate source with trusted checks
+        env:
+          CALM_RELEASE_SOURCE_ROOT: ${{ github.workspace }}/release-source
+        run: python3 .automation/scripts/check.py
+      - name: Run source syntax and regression tests with read-only permissions
+        working-directory: release-source
+        run: |
+          bash scripts/check-static.sh
+          bash scripts/test.sh
+      - name: Build package with read-only permissions
+        uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0 # v2.6.1
+        with:
+          pandoc: 'false'
+          args: -d -t "${{ github.workspace }}/release-source" -r "${{ github.workspace }}/.release" -g forever -n "CalmEUITweaks-{project-version}"
+      - name: Verify candidate package with trusted checks
+        env:
+          CALM_RELEASE_SOURCE_ROOT: ${{ github.workspace }}/release-source
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: python3 .automation/scripts/check.py ".release/CalmEUITweaks-${RELEASE_TAG}.zip" "${RELEASE_TAG#v}"
+      - name: Upload validated candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-candidate
+          path: .release/*.zip
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: Publish validated assets
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.build.outputs.tag }}
+      CALM_RELEASE_SOURCE_ROOT: ${{ github.workspace }}/release-source
+    steps:
+      - name: Check out trusted publishing tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Check out verified source for comparison
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          path: release-source
+          persist-credentials: false
+      - name: Download validated candidate from this run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-candidate
+          path: .release
+      - name: Publish missing assets and verify existing ones
+        run: bash scripts/publish-assets.sh

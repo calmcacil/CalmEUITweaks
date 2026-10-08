@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a problem with Calm UI Tweaks.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check existing issues before submitting a report. Include enough detail to reproduce the problem on WoW Forever.
+  - type: input
+    id: addon-version
+    attributes:
+      label: Calm UI Tweaks version
+      description: Find the version in the addon list or CalmEUITweaks.toc.
+      placeholder: "0.1.3"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: WoW client and EllesmereUI version
+      description: Include the client/server and EUI version or commit, if known.
+      placeholder: "WoW Forever (interface 16001), EllesmereUI version or commit"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the affected feature, relevant settings, and whether you were in combat or Unlock Mode.
+      placeholder: |
+        1. Open ...
+        2. Enable ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Attach screenshots here if they help explain the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Errors and addon status
+      description: Paste any Lua error (including its stack trace) and the output of /calmtweaks status. Remove any personal information before posting.
+      render: text
+  - type: textarea
+    id: other-addons
+    attributes:
+      label: Related addons and additional context
+      description: Include versions of related addons (such as SimpleItemLevel or WhatsTraining), any recent changes, and any troubleshooting you have already tried.

@@ -1,0 +1,28 @@
+## Interface: 16001
+## Title: Calm UI Tweaks
+## Notes: Personal conveniences and compatibility fixes for EllesmereUI
+## Author: Calm
+# x-release-please-start-version
+## Version: 0.2.0
+# x-release-please-end
+## RequiredDeps: EllesmereUI
+## OptionalDeps: SimpleItemLevel, WhatsTraining, EllesmereUIBags
+## SavedVariables: CalmUITweaksDB
+## SavedVariablesPerCharacter: CalmUITweaksCharDB
+
+core\Bootstrap.lua
+core\Settings.lua
+core\Lifecycle.lua
+core\AnchorEvents.lua
+core\Commands.lua
+functions\Macros.lua
+macros\mage.lua
+functions\Chat.lua
+functions\Spacers.lua
+functions\AnchorGap.lua
+functions\SpacerCorners.lua
+compatability\SimpleItemLevel.lua
+compatability\WhatsTraining.lua
+options\Chat.lua
+options\Pages.lua
+options\EllesmereUI.lua

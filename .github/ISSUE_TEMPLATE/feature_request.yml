@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest an improvement to Calm UI Tweaks.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check existing issues before submitting a request. Describe the problem you want to solve and how the improvement would fit your WoW Forever and EllesmereUI setup.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What is difficult or missing in your current setup? Include a concrete example.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe how you would use the feature and what should happen. Include relevant settings or defaults.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: Describe any existing settings, addons, or manual steps you have tried.
+  - type: textarea
+    id: context
+    attributes:
+      label: Setup and additional context
+      description: Include relevant client, EUI, and addon versions. Attach screenshots or mockups if they help explain the request.

@@ -1,0 +1,16 @@
+package-as: CalmEUITweaks
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+ignore:
+  - .github
+  - .gitignore
+  - .gitattributes
+  - .release-please-manifest.json
+  - release-please-config.json
+  - VERSION
+  - AGENTS.md
+  - SPEC.md
+  - tests
+  - scripts
+  - docs

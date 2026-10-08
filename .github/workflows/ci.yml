@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  required:
+    name: Required
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITHUB_OAUTH: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install missing Lua runtime
+        run: bash scripts/install-lua.sh
+      - name: Install verified actionlint binary
+        run: bash scripts/install-actionlint.sh
+      - name: Run repository checks
+        run: bash scripts/check.sh
+      - name: Build dry-run package
+        uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0 # v2.6.1
+        with:
+          pandoc: 'false'
+          args: -d -g forever -n "CalmEUITweaks-{project-version}"
+      - name: Verify package compatibility
+        run: bash scripts/check-package.sh
+      - name: Upload package snapshot
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: calmuitweaks-package-snapshot
+          path: .release/*.zip
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+          compression-level: 0

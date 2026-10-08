@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release Please
+    if: github.ref == 'refs/heads/main' && github.repository == 'calmcacil/CalmEUITweaks'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout release history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check for addon changes since the latest release
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          baseline=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --exclude-drafts --json tagName --jq '.[0].tagName // empty')
+          if [[ -z "$baseline" ]]; then
+            echo 'eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'No published baseline. Publish the prepared initial release before automatic version bumps.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          changes=$(git diff --name-only "$baseline" HEAD -- CalmEUITweaks.toc core functions compatability options macros)
+          if [[ -n "$changes" ]]; then
+            echo 'eligible=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'No addon changes since the latest release; no release PR is needed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Create release GitHub App token
+        if: steps.eligibility.outputs.eligible == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v2.2.1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: CalmEUITweaks
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Create or update the release pull request
+        if: steps.eligibility.outputs.eligible == 'true'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v4.4.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
