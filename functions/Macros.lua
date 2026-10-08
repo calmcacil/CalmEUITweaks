@@ -42,12 +42,11 @@ function ns.RegisterMacroProvider(id, provider)
     local generation = 0
     local requested, awaiting = {}, {}
     local status = "Not initialized."
-    local fallbackErrors = {}
 
     local function SetStatus(message)
         if status == message then return end
         status = message
-        if ns.SetStatus then ns.SetStatus(key, message) end
+        ns.SetStatus(key, message)
     end
 
     local function Settings()
@@ -77,34 +76,19 @@ function ns.RegisterMacroProvider(id, provider)
         if not active or queued then return end
         queued = true
         local ticket = generation
-        local function Flush(self)
-            local ok, ran = pcall(function()
-                if ticket ~= generation or not active then return end
-                queued = false
-                Run()
-                return true
-            end)
+        local function Flush()
+            if ticket ~= generation or not active then return end
+            queued = false
+            local ok, err = pcall(Run)
             if not ok then
-                local textOK, text = pcall(tostring, ran)
-                if not textOK then text = "Unknown macro error." end
-                pcall(SetStatus, "Error: " .. text)
-                if ns.ReportError then
-                    pcall(ns.ReportError, key, ran)
-                elseif not fallbackErrors[text] then
-                    -- Isolated namespaces may not provide the core error boundary.
-                    fallbackErrors[text] = true
-                    if geterrorhandler then
-                        local handlerOK, handler = pcall(geterrorhandler)
-                        if handlerOK and type(handler) == "function" then pcall(handler, ran) end
-                    end
-                end
-            elseif ran then
-                fallbackErrors = {}
-                if ns.ClearError then pcall(ns.ClearError, key) end
+                ns.ReportError(key, err)
+                SetStatus(ns.errors[key])
+            else
+                ns.ClearError(key)
             end
         end
         if C_Timer and C_Timer.After then
-            C_Timer.After(0, function() Flush() end)
+            C_Timer.After(0, Flush)
         else
             Flush()
         end

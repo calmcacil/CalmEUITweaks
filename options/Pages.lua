@@ -19,15 +19,6 @@ local function Recovered(owner)
     end
 end
 
-local function IsSearchPrebuild(eui)
-    if type(eui.IsSearchPrebuild) == "function" then
-        local ok, prebuilding = pcall(eui.IsSearchPrebuild)
-        if ok then return prebuilding == true end
-        error("EUI search prebuild state is unavailable: " .. tostring(prebuilding))
-    end
-    return eui._prebuilding == true
-end
-
 local function UpdateText(label, text, getText)
     if not getText then label:SetText(text); return end
     local readable, value = pcall(getText)
@@ -48,7 +39,7 @@ end
 
 local function Description(parent, y, text, getText, minimumHeight)
     local eui = _G.EllesmereUI
-    if IsSearchPrebuild(eui) then return y - 48 end
+    if eui.IsSearchPrebuild() then return y - 48 end
     y = y - 12
     local label = eui.MakeFont(parent, 12, nil, 1, 1, 1, 0.65)
     local pad = eui.CONTENT_PAD + 20
@@ -74,6 +65,7 @@ local function BuildPage(page, parent, y)
     local widgets = eui and eui.Widgets
     if type(widgets) ~= "table" or type(widgets.SectionHeader) ~= "function"
         or type(widgets.DualRow) ~= "function" or type(widgets.Spacer) ~= "function"
+        or type(eui.BlankRowCfg) ~= "function" or type(eui.IsSearchPrebuild) ~= "function"
         or type(eui.MakeFont) ~= "function" or type(eui.CONTENT_PAD) ~= "number"
         or type(eui.PanelPP) ~= "table" or type(eui.PanelPP.Point) ~= "function" then
         ns.optionsRenderError = "EUI widget interface is unavailable or incompatible."
@@ -86,7 +78,7 @@ local function BuildPage(page, parent, y)
         y = y - height
     end
     local function Row(left, right)
-        local _, height = widgets:DualRow(parent, y, left, right or { type = "label", text = "" })
+        local _, height = widgets:DualRow(parent, y, left, right or eui.BlankRowCfg())
         y = y - height
     end
     local function Text(text, getText, minimumHeight)
@@ -165,8 +157,8 @@ local function BuildPage(page, parent, y)
         Row(SpacerToggle(1), SpacerToggle(2))
         Row(SpacerToggle(3), SpacerToggle(4))
         Text("Enable up to four spacers, then open EUI Unlock Mode. Find them under Calm UI Tweaks and set their Width / Height to the gap you want.")
-        Text("For a centered power bar: anchor Spacer 1 to the bar's LEFT edge, then Player to Spacer 1's LEFT edge. Anchor Spacer 2 to the bar's RIGHT edge, then Target to Spacer 2's RIGHT edge. Use zero anchor offsets for a gap equal to the spacer width.")
-        Text("Spacers are invisible during gameplay. Enable switches, sizes, standalone positions and corner choices are shared across the account; EUI manages anchor links in its current layout. Disabling removes links, so detach frames in Unlock Mode first if you want to keep their current placement.")
+        Text("Anchor a spacer between two frames using zero offsets. Its width sets LEFT / RIGHT gaps; its height sets TOP / BOTTOM gaps. See the README for a centered power bar example.")
+        Text("Spacer settings and geometry are account-wide. EUI owns the links in its current layout. Disabling removes those links; detach dependent frames first to preserve their placement.")
         Spacer()
         Section("PLAYER / TARGET CORNER ALIGNMENT")
         local function Corner(unit, label)
@@ -196,11 +188,9 @@ local function BuildPage(page, parent, y)
             }
         end
         Row(Corner("player", "Player"), Corner("target", "Target"))
-        Text("Anchor Player to the LEFT of a spacer, then choose Player Top Right: its top right corner touches the spacer's top left. Anchor Target to the RIGHT, then choose Target Top Left for the opposite pair. Bottom corners work the same way. For TOP anchors choose a bottom corner; for BOTTOM anchors choose a top corner. Alignment follows size changes; later manual nudges are preserved.")
+        Text("Choose a frame corner facing the spacer after saving its anchor. New selections reset offsets so the corners touch; later size changes preserve manual nudges. EUI Default leaves the current link in place.")
     elseif page == "Anchors" then
         Section("DEFAULT ANCHOR SPACING")
-        Row(Toggle("anchorGap", "enabled", "Automatic anchor gap",
-            "Adds the side's default gap once to newly created flush edge anchors in EUI Unlock Mode. Existing links and manual offsets are preserved. Defaults off."))
         local function Gap(side, label)
             return {
                 type = "slider", text = label .. " gap (pixels)", min = 0, max = 10, step = 1, noCapture = true,
@@ -209,11 +199,13 @@ local function BuildPage(page, parent, y)
                 tooltip = "Spacing outside the target's " .. label:lower() .. " side, in physical pixels. Zero keeps new links flush. Applies to future anchors only.",
             }
         end
-        Row(Gap("top", "Top"), Gap("bottom", "Bottom"))
-        Row(Gap("left", "Left"), Gap("right", "Right"))
-        Text("Enable this before anchoring bars in EUI Unlock Mode. Each new LEFT / RIGHT / TOP / BOTTOM link uses that target side's default spacing. Choose 0 for flush placement, 1 for a tighter layout or 2 for a small gap.")
-        Text("Action/CDM bar corner presets get spacing only away from the attached side. Top/Bottom corners keep left/right edges aligned; vertical bars keep top/bottom edges aligned and use Left/Right spacing.")
-        Text("Existing links, nonzero edge offsets, center/diagonal anchors, screen edges and spacer links are left alone. Save keeps the new offsets; Discard restores EUI's original layout. Disabling stops adding gaps and leaves saved offsets intact.")
+        Row(Toggle("anchorGap", "enabled", "Automatic anchor gap",
+            "Adds the side's default gap once to newly created flush edge anchors in EUI Unlock Mode. Existing links and manual offsets are preserved. Defaults off."),
+            Gap("top", "Top"))
+        Row(Gap("bottom", "Bottom"), Gap("left", "Left"))
+        Row(Gap("right", "Right"))
+        Text("Enable before creating links in EUI Unlock Mode. Zero keeps new links flush. Bar corner presets keep their edge alignment and move outward on the attached side only.")
+        Text("Existing links, manual offsets, center/diagonal anchors, screen edges and spacer links are preserved. Save keeps new gaps; Discard restores the layout. Disabling retains saved offsets.")
     end
     return math.abs(y) + 12
 end

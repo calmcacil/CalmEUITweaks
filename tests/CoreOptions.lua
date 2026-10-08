@@ -118,11 +118,12 @@ local function sandbox(options)
         eui.CaptureWidget = forbidden
         eui.Widgets = {}
         function eui.Widgets:SectionHeader(parent, text, y)
+            s.section = text
             s.sections[#s.sections + 1] = { parent = parent, text = text, y = y }
             return nil, 30
         end
         function eui.Widgets:DualRow(parent, y, left, right)
-            s.rows[#s.rows + 1] = { parent = parent, y = y, left = left, right = right }
+            s.rows[#s.rows + 1] = { parent = parent, y = y, left = left, right = right, section = s.section }
             for _, cfg in ipairs({ left, right }) do
                 if cfg.type == "toggle" then
                     equal(cfg.noCapture, true, "editable widget must opt out of EUI capture")
@@ -237,6 +238,7 @@ local function enablePluginAPI(s)
     local eui = s.env.EllesmereUI
     s.pluginCalls, s.openPluginCalls = 0, 0
     eui.PLUGIN_API_VERSION = 1
+    eui.IsSearchPrebuild = function() return false end
     eui.RegisterPlugin = function(name, config, ...)
         equal(name, addonName, "RegisterPlugin must be a dot call")
         equal(select("#", ...), 0, "RegisterPlugin argument count")
@@ -333,7 +335,7 @@ test("malformed saved variable containers and nested settings are repaired", fun
 end)
 
 test("invalid persisted macro names revert to the default", function()
-    for _, name in ipairs({ "", string.rep("x", 17), "bad|name", "bad\nname", false, {} }) do
+    for _, name in ipairs({ "", "   ", string.rep("x", 17), "bad|name", "bad\nname", false, {} }) do
         local s = core({ db = { mageMacro = { name = name } } }):initialize()
         equal(s.ns.db.mageMacro.name, "Mage FoodWater")
     end
@@ -449,6 +451,18 @@ test("identical errors are deduplicated without losing their displayed status", 
     contains(s.ns.GetStatus("mageMacro"), "same failure")
     s.ns.ReportError("mageMacro", "different failure")
     equal(#s.errors, 2)
+end)
+
+test("a recurring error reports again after recovery", function()
+    local s = core()
+    s.ns.ReportError("mageMacro", "provider failed")
+    s.ns.ReportError("mageMacro", "provider failed")
+    equal(#s.errors, 1, "repeated failures in one episode must be deduplicated")
+    s.ns.ClearError("mageMacro")
+    equal(s.ns.errors.mageMacro, nil)
+    s.ns.ReportError("mageMacro", "provider failed")
+    equal(#s.errors, 2, "the same failure must report again after recovery")
+    contains(s.ns.GetStatus("mageMacro"), "provider failed")
 end)
 
 test("deferred modules retain errors until their actual execution clears them", function()
@@ -726,15 +740,31 @@ test("absent host rejects cleanly while Core remains usable", function()
     contains(s.messages[#s.messages], "unavailable")
 end)
 
-test("pages work before the optional BlankRowCfg helper is loaded", function()
-    local s = core()
-    enablePluginAPI(s)
-    s.env.EllesmereUI.BlankRowCfg = nil
-    s:load("Options.lua")
-    equal(s.ns.optionsInstalled, true)
-    s:initialize():login()
-    truth(s:build("General") > 0)
-    truth(s:build("Compatibility") > 0)
+test("empty right slots use fresh EUI blanks and finish their section", function()
+    local s = optionsFixture():initialize():login()
+    local blanks = {}
+    s.env.EllesmereUI.BlankRowCfg = function()
+        local cfg = { type = "label", text = "" }
+        blanks[cfg] = true
+        return cfg
+    end
+    local used = {}
+    for _, page in ipairs(s.pluginRegistration.modules[1].pages) do
+        s.rows = {}
+        truth(s:build(page) > 0)
+        for index, row in ipairs(s.rows) do
+            truth(row.left and row.right, "DualRow requires both slots")
+            truth(row.left.type ~= "label", "rows must fill the left slot first")
+            if row.right.type == "label" and row.right.text == "" then
+                truth(blanks[row.right], "empty slots must use EUI's blank factory")
+                truth(not used[row.right], "each empty slot needs a fresh config")
+                used[row.right] = true
+                local following = s.rows[index + 1]
+                truth(not following or following.section ~= row.section,
+                    "only a section's final row may have an empty slot: " .. page)
+            end
+        end
+    end
     s:storageUnchanged()
 end)
 
@@ -1010,7 +1040,7 @@ end)
 test("hidden search builders create no frames or labels and activate no modules", function()
     local s = optionsFixture():initialize()
     local modules = { s:module("mageMacro"), s:module("simpleItemLevel"), s:module("whatsTraining") }
-    s.env.EllesmereUI._prebuilding = true
+    s.env.EllesmereUI.IsSearchPrebuild = function() return true end
     local frames, db, charDB = #s.frames, copy(s.ns.db), copy(s.ns.charDB)
     for _, page in ipairs(s.pluginRegistration.modules[1].pages) do s:build(page) end
     equal(#s.frames, frames)
@@ -1019,7 +1049,7 @@ test("hidden search builders create no frames or labels and activate no modules"
     same(s.ns.db, db)
     same(s.ns.charDB, charDB)
     equal(#s.timers, 0)
-    s.env.EllesmereUI._prebuilding = false
+    s.env.EllesmereUI.IsSearchPrebuild = function() return false end
     truth(s:build("Mage Macro") > 0)
     truth(#s.labels > 0)
     s:storageUnchanged()
@@ -1082,6 +1112,45 @@ test("cached macro name follows settings changes without rebuilding", function()
     s.pluginRegistration.modules[1].onPageCacheRestore()
     equal(macroName.text, "Macro name: Restored Name")
     s:storageUnchanged()
+end)
+
+test("saving the first chat default refreshes native action buttons", function()
+    local s = optionsFixture():initialize():login()
+    local eui = s.env.EllesmereUI
+    local disabled, saveButton = {}, nil
+    local function RefreshButtons()
+        for _, row in ipairs(s.rows) do
+            for _, cfg in ipairs({row.left, row.right}) do
+                if cfg.type == "button" then
+                    disabled[cfg.text] = cfg.disabled()
+                    if cfg.text == "Save Default" then saveButton = cfg end
+                end
+            end
+        end
+    end
+    s:build("Chat")
+    local rowCount = #s.rows
+    RefreshButtons()
+    equal(disabled["Apply Default"], true)
+    equal(disabled["Export Default"], true)
+    eui.ShowConfirmPopup = function(self, cfg)
+        equal(self, eui)
+        cfg.onConfirm()
+    end
+    eui.RefreshPage = function(self, force)
+        equal(self, eui)
+        equal(force, nil, "chat actions must refresh controls without rebuilding")
+        RefreshButtons()
+    end
+    s.ns.Chat.SaveDefault = function()
+        s.ns.db.chat.default = {export = "saved setup", savedAt = 1}
+        return true
+    end
+    saveButton.onClick()
+    equal(disabled["Apply Default"], false, "Apply must unlock after the first save")
+    equal(disabled["Export Default"], false, "Export must unlock after the first save")
+    equal(#s.rows, rowCount)
+    equal(s.ns.errors.options, nil)
 end)
 
 

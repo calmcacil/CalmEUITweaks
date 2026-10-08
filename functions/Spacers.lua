@@ -10,6 +10,12 @@ end
 local function UnregisterEvent(event)
     if eventMask[event] then events:UnregisterEvent(event); eventMask[event] = nil end
 end
+local function UnregisterListener()
+    if listenerHost and type(listenerHost.UnregisterUnlockModeListener) == "function" then
+        listenerHost:UnregisterUnlockModeListener(addonName .. "_Spacers")
+    end
+    listenerHost = nil
+end
 local points = { CENTER = true, LEFT = true, RIGHT = true, TOP = true, BOTTOM = true,
     TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true }
 
@@ -104,10 +110,7 @@ function module:ApplySettings()
         pending = false
         UnregisterEvent("PLAYER_REGEN_ENABLED")
         UnregisterEvent("PLAYER_ENTERING_WORLD")
-        if listenerHost and type(listenerHost.UnregisterUnlockModeListener) == "function" then
-            listenerHost:UnregisterUnlockModeListener(addonName .. "_Spacers")
-            listenerHost = nil
-        end
+        UnregisterListener()
         ns.SetStatus("spacers", "Disabled")
         return
     end
@@ -151,7 +154,10 @@ function module:ApplySettings()
     end
     ns.SetStatus("spacers", count == 0 and "Disabled" or (count .. " spacer(s) enabled."))
     if count > 0 then RegisterEvent("PLAYER_ENTERING_WORLD")
-    else UnregisterEvent("PLAYER_ENTERING_WORLD") end
+    else
+        UnregisterEvent("PLAYER_ENTERING_WORLD")
+        UnregisterListener()
+    end
 end
 
 function module:Initialize()

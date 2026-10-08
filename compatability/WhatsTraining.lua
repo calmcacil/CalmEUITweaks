@@ -40,7 +40,7 @@ local ownedLayouts = setmetatable({}, {__mode = "k"})
 local nativeHidden = setmetatable({}, {__mode = "k"})
 local textRoles = setmetatable({}, {__mode = "k"})
 local fontRoles = setmetatable({}, {__mode = "k"})
-local unpackValues = unpack or table.unpack
+local unpackValues = unpack
 local pending, applying = false, false
 local initialized = false
 local status = "Waiting for initialization"

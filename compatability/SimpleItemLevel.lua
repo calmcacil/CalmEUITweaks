@@ -274,8 +274,7 @@ local function SettingsChanged()
 end
 
 local function HookSettings()
-    -- SIL 926c410: ns.RefreshOverlayFrames is private. These named dropdowns
-    -- expose its canvas panels; checkbox SetValue and slider scripts apply settings.
+    -- SIL's refresh callback is private; watch its settings controls instead.
     settingsSnapshot = SILSettings()
     local function Controls(frame, depth)
         if not frame or depth > 4 then return end

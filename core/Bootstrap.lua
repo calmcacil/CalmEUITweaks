@@ -46,6 +46,7 @@ end
 function ns.ClearError(key)
     if not ns.errors[key] then return end
     ns.errors[key] = nil
+    reportedErrors[key] = nil
     failedMethods[key] = nil
     RefreshStatus()
 end
