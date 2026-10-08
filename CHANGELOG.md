@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/calmcacil/CalmEUITweaks/compare/v0.2.0...v0.2.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* avoid redundant compatibility refresh work ([#3](https://github.com/calmcacil/CalmEUITweaks/issues/3)) ([2e05f87](https://github.com/calmcacil/CalmEUITweaks/commit/2e05f87056d097eceb6291ae68f367f7783776bc))
+* **ci:** reuse checkout history for release verification ([#2](https://github.com/calmcacil/CalmEUITweaks/issues/2)) ([378dfdc](https://github.com/calmcacil/CalmEUITweaks/commit/378dfdc2c26db9096c80e2cebd433d1520398c2a))
+
 ## 0.2.0 (2026-10-08)
 
 Consolidated testing release for WoW Forever with EllesmereUI.
