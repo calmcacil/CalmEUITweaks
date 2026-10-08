@@ -10,14 +10,16 @@ versions and workflows, and builds a BigWigs package snapshot. The aggregate
 checks are named `Required` and `PR title`. The title check also reruns when a
 PR title is edited. In-game verification in SPEC.md remains necessary.
 
-Main requires a pull request, an up-to-date branch, both checks, and resolved
-review threads. No bypass actors are configured. Approval count is zero, matching
-the solo-maintainer Go project; a second reviewer is not required. Only squash
-merges are enabled, using the PR title and body for the commit. Merged branches
+The active main ruleset requires a pull request, an up-to-date branch, both
+checks from GitHub Actions, and resolved review threads. It also blocks force
+pushes and deletion. No bypass actors are configured. Approval count is zero;
+a second reviewer is not required. Only squash merges are enabled, using the
+PR title and body for the commit. Merged branches
 are deleted automatically, and auto-merge is available after checks pass.
 
-Release tags matching v* cannot be moved or deleted. Actions require full commit
-SHA pins and allow GitHub-owned actions plus googleapis/release-please-action and
+The active release-tag ruleset prevents tags matching v* from being moved or
+deleted, while allowing new release tags to be created. Actions require full
+commit SHA pins and allow GitHub-owned actions plus googleapis/release-please-action and
 BigWigsMods/packager. Default workflow permissions remain read-only, and Actions
 cannot approve pull requests. CodeQL does not support Lua; Go and container
 scanners are not applicable to this addon.
