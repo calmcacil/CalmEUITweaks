@@ -40,6 +40,9 @@ The addon uses no `OnUpdate` handlers or repeating tickers. Anchor changes use
 native EUI notifications and secure placement hooks; disabled features release
 their event subscriptions. The bag bridge skips hidden/disabled scopes, reuses
 unchanged item results, and filters item-data notifications to tracked items.
+Repeated setters for unchanged bag items retain cached or pending results.
+Training theme passes skip the hidden spellbook and unchanged native font writes;
+showing the spellbook applies pending theme changes.
 
 ## Spacer anchors
 

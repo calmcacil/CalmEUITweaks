@@ -103,6 +103,8 @@ end
 
 local function frame(parent)
     local value = region("Frame")
+    value.parent = parent
+    function value:IsVisible() return self.shown and (not self.parent or self.parent:IsVisible()) end
     value.children, value.regions, value.scripts = {}, {}, {}
     if parent then parent.children[#parent.children + 1] = value end
     function value:GetRegions() return unpackValues(self.regions) end
@@ -309,6 +311,7 @@ row.heading.color = {0.19, 0.12, 0.06, 0.77}
 row.spell = {}
 row.regions[#row.regions + 1] = row.heading
 row.name = text(15)
+function row.name:IsVisible() return row:IsVisible() end
 row.regions[#row.regions + 1] = row.name
 row.rank = text(13)
 row.regions[#row.regions + 1] = row.rank
@@ -587,7 +590,27 @@ local enumerate = book.PagedSpellsFrame.EnumerateFrames
 book.PagedSpellsFrame.EnumerateFrames = function() error("Page is not realized yet") end
 GameFontNormal, GameFontHighlightSmall = text(14), text(12)
 GameFontNormal.font, GameFontHighlightSmall.font = {"FallbackSpell.ttf", 14, ""}, {"FallbackRank.ttf", 12, ""}
+GameFontHighlightSmall.fontObject.font = GameFontHighlightSmall.font
 EllesmereUI._WSkinRefreshLooks(); drain()
+for _ = 1, 20 do
+    GameFontNormal:SetFont(unpackValues(GameFontNormal.font))
+    GameFontHighlightSmall:SetFontObject(GameFontHighlightSmall:GetFontObject())
+end
+equal(#queue, 0, "Unchanged shared font setters do not schedule theme passes")
+PlayerSpellsFrame:Hide(); drain()
+local treeReads, originalChildren = 0, overlay.GetChildren
+overlay.GetChildren = function(self) treeReads = treeReads + 1; return originalChildren(self) end
+GameFontNormal:SetFont("HiddenSpell.ttf", 14, "")
+row.name:SetText("Hidden |cff301f0fspell|r")
+equal(row.name:GetText(), "Hidden |cff301f0fspell|r", "Hidden label setters defer text adaptation")
+EllesmereUI._WSkinRefreshLooks(); drain()
+equal(treeReads, 0, "A hidden parent prevents training tree walks")
+equal(row.name.font[1], "FallbackSpell.ttf", "Hidden theme changes wait until the spellbook is visible")
+PlayerSpellsFrame:Show(); book:Fire("OnShow"); drain()
+equal(row.name.font[1], "HiddenSpell.ttf", "Showing the spellbook applies deferred native font changes")
+equal(row.name:GetText(), "Hidden |cffffffffspell|r", "Showing the spellbook adapts the latest hidden text")
+overlay.GetChildren = originalChildren
+GameFontNormal:SetFont("FallbackSpell.ttf", 14, ""); drain()
 equal(ns.errors.whatsTraining, nil, "Unavailable native items do not break the skin")
 equal(row.name.font[1], "FallbackSpell.ttf", "Missing spell item falls back to Blizzard's spell font")
 equal(row.rank.font[1], "FallbackRank.ttf", "Missing spell item falls back to Blizzard's rank font")
