@@ -49,6 +49,10 @@ local function fixture(db, charDB, lateListener)
         assert(owner == "CalmEUITweaks_Spacers")
         listener = callback
     end
+    function eui:UnregisterUnlockModeListener(owner)
+        assert(owner == "CalmEUITweaks_Spacers")
+        listener = nil
+    end
     eui.IsUnlockAnchored = function(key) return links[key] ~= nil end
     eui.ReapplyOwnAnchor = function(key)
         local element = registry[key]
@@ -88,6 +92,7 @@ local function fixture(db, charDB, lateListener)
         assert(not next(ns.errors), ns.errors.spacers)
     end
     function s:counts() return registrations, removals end
+    function s:hasListener() return listener ~= nil end
     assert(not next(ns.errors), ns.errors.spacers)
     return s
 end
@@ -113,6 +118,16 @@ test("default off creates no spacer frames or registrations", function()
     local s = fixture()
     assert(not next(s.registry) and #s.frames == 1)
     assert(s.ns.GetStatus("spacers") == "Disabled")
+end)
+
+test("disabling the last spacer releases its native listener", function()
+    local s = fixture({spacers = {spacer1 = true}})
+    assert(s:hasListener())
+    s.ns.SetSetting("spacers", "spacer1", false)
+    assert(not s:element() and not s:hasListener(), "Disabled spacers must release the Unlock Mode listener")
+    assert(not next(s.frames[1].events), "Disabled spacers must release frame events")
+    s.ns.SetSetting("spacers", "spacer1", true)
+    assert(s:element() and s:hasListener(), "Re-enabling must register the listener again")
 end)
 test("four independent switches register unique native elements", function()
     local s = fixture()

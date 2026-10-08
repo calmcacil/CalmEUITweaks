@@ -13,9 +13,14 @@ Mage Macro, Compatibility, Chat, Spacers and Anchors.
 
 Settings belong to this addon rather than EUI profiles or conditional overrides.
 Unavailable or rejected plugin APIs disable options and report a status reason;
-features retain their own dependency checks. Hidden search builds avoid custom
-label creation. Module and page errors are isolated and clear when the failing
-operation recovers.
+features retain their own dependency checks. Pages use native two-slot rows,
+filled left to right. Only the final row of a section may have an empty slot,
+using a fresh `EllesmereUI.BlankRowCfg()` for that slot. Hidden search builds use
+`EllesmereUI.IsSearchPrebuild()` to avoid custom label creation. Page callbacks
+refresh cached labels; chat actions also refresh native widget states in place.
+Module and page errors are isolated and clear when the failing operation
+recovers. Repeated reports are deduplicated until recovery; a later recurrence
+reports again.
 
 ## Storage and lifecycle
 
@@ -34,8 +39,9 @@ Runtime Lua must not register `OnUpdate` handlers, repeating tickers or timer
 polling chains. Deferred work uses coalesced, bounded event-triggered callbacks.
 Idle or disabled features release event subscriptions; combat-end listeners are
 armed only while protected work is pending. Unrelated addon loads do not schedule
-geometry or theme work. The source validator enforces the
-update-handler/ticker restriction.
+geometry or theme work. Runtime, test and packaged Lua must be ASCII only.
+The source/package validator enforces ASCII and the source validator enforces
+the update-handler/ticker restriction.
 
 Legacy character spacer layouts seed missing account layouts with a deep copy
 on initialization. Existing account layouts take precedence; obsolete character
@@ -191,8 +197,10 @@ must not contain font files; use a separate personal SharedMedia addon.
 | `options/` | Native EUI plugin registration, pages and chat dialogs. |
 | `tests/` | Standalone Lua regression tests with mocked WoW/EUI APIs. |
 
-Anchor integration depends on EUI's element registry, anchor records and native
-reapply APIs. Revalidate those interfaces when updating EUI.
+Anchor integration depends on EUI's private element registry, anchor records,
+placement hooks and native reapply APIs. WhatsTraining also hooks private skin
+refresh helpers. These dependencies are outside the supported plugin contract;
+revalidate them when updating EUI.
 
 ## Verification
 
@@ -214,7 +222,9 @@ lua CalmEUITweaks/tests/Smoke.lua
 Before a release, verify on the installed Forever/EUI build:
 
 - [ ] Open all six pages, use search, check status and confirm settings survive
-  reload and remain independent of EUI profile changes.
+  reload and remain independent of EUI profile changes. Check row packing at
+  different UI scales and that saving/importing the first chat default enables
+  Apply Default and Export Default immediately.
 - [ ] Exercise all spacers, centered-bar chains, resizing, removal, Save/Discard,
   facing corners, scales, manual nudges and combat transitions.
 - [ ] Create side and action/CDM corner links with asymmetric gaps, including zero.

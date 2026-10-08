@@ -43,7 +43,7 @@ local function New(account, character, loggedIn)
         if s.failAt == s.writes then error("native write failed") end
     end
     for id = 1, NUM_CHAT_WINDOWS do
-        local f = { id = id, name = id == 1 and "General" or id == 2 and "Combat Log" or id == 3 and "Voice" or id == 4 and "Loot: | café" or "",
+        local f = { id = id, name = id == 1 and "General" or id == 2 and "Combat Log" or id == 3 and "Voice" or id == 4 and "Loot: | caf\195\169" or "",
             width = 400 + id, height = 180 + id, left = 10 * id, bottom = 20 * id,
             shown = id <= 2 or id == 4, locked = id <= 4, uninteractable = false, font = 12 + id,
             r = 0.1, g = 0.2, b = 0.3, a = 0.4, fading = true, visible = 120,
@@ -162,7 +162,7 @@ local source, owner, chat = New()
 Check(chat.SaveDefault(), "Capture saved")
 local exported = assert(chat.ExportDefault())
 Check(not chat.NeedsApply(), "Saving character already applied")
-Check(exported:match("^CUTCHAT2:") and not exported:find("café", 1, true), "Printable versioned Unicode-safe export")
+Check(exported:match("^CUTCHAT2:") and not exported:find("caf\195\169", 1, true), "Printable versioned Unicode-safe export")
 Check(source.writes == 0, "Saving never mutates native chat")
 local account = Copy(owner.db.chat)
 local target, other, migrated = New(account)
@@ -181,7 +181,7 @@ target.windows[4].locked, target.windows[4].uninteractable = false, true
 local voiceBefore = Copy(target.windows[3])
 target.joined.General, target.joined.Trade = 95, 64
 Check(migrated.ApplyDefault(), "Native restore succeeds")
-Check(target.windows[4].name == "Loot: | café" and not target.windows[5].shown, "Saved tab replaces existing and closes extra")
+Check(target.windows[4].name == "Loot: | caf\195\169" and not target.windows[5].shown, "Saved tab replaces existing and closes extra")
 Check(#target.dock == 3 and target.dock[2].id == 2 and target.dock[3].id == 4 and target.selected.id == 4, "Dock order and selected tab restored")
 Check(target.windows[2].groups[1] == "SYSTEM" and target.windows[2].history[1] == "untouched", "Combat filters and history preserved")
 Check(target.windows[1].channels[1] == "General" and target.windows[4].channels[1] == "Trade", "Channels persisted by name despite different numbers")

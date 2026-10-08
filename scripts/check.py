@@ -47,9 +47,13 @@ def check_source():
     for file in validate_toc(text, version):
         require((ROOT / file).is_file(), f"Missing runtime file: {file}")
         if file.endswith(".lua"):
-            source = (ROOT / file).read_text(encoding="utf-8-sig")
+            content = (ROOT / file).read_bytes()
+            require(content.isascii(), f"Non-ASCII Lua source: {file}")
+            source = content.decode("ascii")
             require(not re.search(r"\bOnUpdate\b|\bNewTicker\b", source),
                     f"Continuous update callbacks are prohibited: {file}")
+    for file in (ROOT / "tests").glob("*.lua"):
+        require(file.read_bytes().isascii(), f"Non-ASCII Lua test: {file.relative_to(ROOT)}")
     print(f"Source validated for {ADDON} {version}")
 
 
@@ -64,7 +68,7 @@ def check_package(archive, version):
             require(parts and parts[0] == ADDON and ".." not in parts and "\\" not in name,
                     f"Invalid package path: {name}")
             if len(parts) > 1:
-                require(parts[1] not in {"tests", "scripts", "docs", "SPEC.md", "VERSION",
+                require(parts[1] not in {"tests", "scripts", "docs", "AGENTS.md", "SPEC.md", "VERSION",
                                         "release-please-config.json"} and not parts[1].startswith("."),
                         f"Development file in package: {name}")
         text = package.read(f"{ADDON}/{ADDON}.toc").decode("utf-8-sig")
@@ -75,6 +79,7 @@ def check_package(archive, version):
             content = package.read(f"{ADDON}/{file}")
             source = (ROOT / file).read_bytes()
             if file.endswith(".lua"):
+                require(content.isascii(), f"Non-ASCII packaged Lua: {file}")
                 content = content.replace(b"\r\n", b"\n")
                 source = source.replace(b"\r\n", b"\n")
             require(content == source, f"Packaged file differs from source: {file}")

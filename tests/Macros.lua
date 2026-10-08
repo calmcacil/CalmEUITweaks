@@ -19,7 +19,7 @@ local function New(options)
         writes = 0, combat = false, reports = {}, clears = 0,
     }
     local settings = { enabled = options.enabled ~= false, name = options.name or "Mage FoodWater" }
-    local ns = { ready = true, charDB = { version = 1, mageMacro = {} } }
+    local ns = { ready = true, errors = {}, charDB = { version = 1, mageMacro = {} } }
     local module
 
     ns.GetSettings = function(key)
@@ -38,6 +38,7 @@ local function New(options)
     ns.ReportError = function(key, err)
         assert(key == "mageMacro", "Unexpected error settings key")
         state.coreError = tostring(err)
+        ns.errors[key] = "Error: " .. state.coreError
         if not reported[state.coreError] then
             reported[state.coreError] = true
             state.reports[#state.reports + 1] = state.coreError
@@ -47,6 +48,7 @@ local function New(options)
         assert(key == "mageMacro", "Unexpected clear settings key")
         state.clears = state.clears + 1
         state.coreError = nil
+        ns.errors[key] = nil
         reported = {}
     end
 

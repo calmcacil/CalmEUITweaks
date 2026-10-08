@@ -9,8 +9,6 @@ local loginChecked, loginDefault = false, nil
 local generation = 0
 local UpdateEvents
 local eventMask = {}
-local unpack = unpack or table.unpack
-
 local function Refresh()
     if type(ns.RefreshOptions) == "function" then
         local ok, err = pcall(ns.RefreshOptions)

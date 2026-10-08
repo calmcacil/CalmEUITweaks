@@ -39,7 +39,7 @@ local function ValidateVersion(db)
 end
 
 local function IsValidMacroName(name)
-    return name ~= "" and #name <= (MAX_MACRO_NAME_LENGTH or 16) and not name:find("[%c|]")
+    return name:find("%S") ~= nil and #name <= (MAX_MACRO_NAME_LENGTH or 16) and not name:find("[%c|]")
 end
 
 local gapSides = { "top", "bottom", "left", "right" }
