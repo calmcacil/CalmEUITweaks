@@ -3,7 +3,7 @@
 A companion addon for [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/)
 on WoW Forever. It adds spacer anchors, automatic anchor gaps, shared chat
 setups, a mage food/water macro, bag item levels and potential upgrade markers,
-and a compatibility fix for WhatsTraining.
+quest-object sparkles, and a compatibility fix for WhatsTraining.
 
 ## Requirements and installation
 
@@ -27,6 +27,7 @@ Use `/calmtweaks status` to check dependencies and errors.
 | Mage macro | Enabled | Maintains a character macro using supported known food/water ranks. |
 | Bag item levels | Enabled for all scopes | Displays equipment item levels and potential upgrade arrows in EUI inventory, reagent bags and bank. |
 | WhatsTraining fix | Enabled | Themes the training tab to match EUI's spellbook, including backgrounds, fonts and controls. |
+| Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
 | Chat sharing | Manual; automatic updates off | Shares normal tabs, docking order, message groups and channel subscriptions. |
 | Spacer anchors | All four off | Adds invisible, resizable elements to EUI Unlock Mode. |
 | Player/Target corners | EUI Default | Aligns facing corners when these frames are anchored to a spacer. |
@@ -46,6 +47,25 @@ refresh calls do no item queries. Equipped item-data notifications are subscribe
 only while a requested lookup is pending.
 Training theme passes skip the hidden spellbook and unchanged native font writes;
 showing the spellbook applies pending theme changes.
+
+## Quest loot sparkles
+
+Enable **Quest loot sparkles** on **General** to use the client's native sparkle
+effect on lootable quest objects. This disables normal and raid outline
+highlighting. Graphics changes reapply the sparkle settings while enabled;
+there is no polling or custom animation. Ore and herb approach sparkles are
+not included.
+
+Disabling or resetting the toggle restores graphics values changed by this
+feature when they still match its last writes. Previous values survive reloads
+and character switches; later external values are preserved. Changes wait until
+combat ends. Restart the game to remove lingering sparkles; `/reload` is not
+enough on the researched Forever build.
+
+When replacing ForeverLootSparkles, turn its options off first, then disable
+that addon and restart the game. Console variables persist independently of
+addons. Calm UI Tweaks cannot recover graphics values previously changed by
+another addon; values already configured for sparkles are left as found.
 
 ## Spacer anchors
 

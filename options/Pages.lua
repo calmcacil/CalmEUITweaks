@@ -96,7 +96,9 @@ local function BuildPage(page, parent, y)
             Toggle("simpleItemLevel", "enabled", "Bag item levels",
                 "Shows item levels and potential upgrades in EUI bags and bank. Configure scopes on the Compatibility tab."))
         Row(Toggle("whatsTraining", "enabled", "WhatsTraining spellbook theme",
-            "Themes the WhatsTraining tab to match the active EUI spellbook skin, including fonts, controls and backgrounds. Disabling restores owned changes."))
+            "Themes the WhatsTraining tab to match the active EUI spellbook skin, including fonts, controls and backgrounds. Disabling restores owned changes."),
+            Toggle("questLootSparkles", "enabled", "Quest loot sparkles",
+                "Enables native quest-object sparkles by disabling normal and raid outlines. Off by default. Disabling restores owned graphics settings; restart the game to remove lingering sparkles."))
     elseif page == "Mage Macro" then
         Section("MAGE FOOD AND WATER")
         Row(Toggle("mageMacro", "enabled", "Maintain character macro",

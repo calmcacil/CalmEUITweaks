@@ -5,6 +5,7 @@ ns.defaults = {
     mageMacro = { enabled = true, name = "Mage FoodWater" },
     simpleItemLevel = { enabled = true, inventory = true, reagent = true, bank = true },
     whatsTraining = { enabled = true },
+    questLootSparkles = { enabled = false },
     chat = { autoApply = false },
     spacers = { spacer1 = false, spacer2 = false, spacer3 = false, spacer4 = false },
     spacerLayouts = {},
@@ -128,9 +129,11 @@ function ns.ResetSettings()
     -- Preference resets preserve macro ownership and the saved chat setup.
     local chatDefault = ns.db.chat.default
     local spacerLayouts = ns.db.spacerLayouts
+    local sparkleRestore = ns.db.questLootSparkles.restore
     for key, value in pairs(ns.defaults) do ns.db[key] = Copy(value) end
     ns.db.chat.default = chatDefault
     ns.db.spacerLayouts = spacerLayouts
+    ns.db.questLootSparkles.restore = sparkleRestore
     if ns.ready then
         for _, key in ipairs(ns.moduleOrder) do ns.CallModule(key, "ApplySettings") end
     end

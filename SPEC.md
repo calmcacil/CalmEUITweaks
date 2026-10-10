@@ -26,7 +26,7 @@ reports again.
 
 | Store | Contents |
 | --- | --- |
-| `CalmUITweaksDB` | Account preferences, saved chat default and spacer geometry (`spacerLayouts`). |
+| `CalmUITweaksDB` | Account preferences, saved chat default, spacer geometry (`spacerLayouts`) and quest-sparkle graphics restoration records. |
 | `CalmUITweaksCharDB` | Macro ownership, chat apply records and corner baselines tied to native EUI anchors. |
 | EUI layout | Native anchor and size-match links, including offsets and growth pins. |
 
@@ -57,6 +57,29 @@ macros and existing non-spacer anchor offsets, and lets native spacer removal
 clean up links.
 
 ## Feature contracts
+
+### Quest loot sparkles
+
+- One account toggle on General defaults off. It enables the native quest-object
+  effect, with no gathering-node effects, custom textures or animation loop.
+- Enabled values are `outlineModeShowLootEffectWhenDisabled=1`,
+  `graphicsOutlineMode=0`, `OutlineEngineMode=0`, `raidGraphicsOutlineMode=0`
+  and `RAIDOutlineEngineMode=0`. Normal and raid outlines are disabled.
+- Login, world entry, variable readiness and relevant console-variable changes
+  apply settings through coalesced callbacks. Own writes and unrelated changes
+  schedule no work. No timers poll; disabled features release event subscriptions.
+  Combat-end subscription exists only while a change or restoration is pending.
+- `questLootSparkles.restore` retains previous and applied values account-wide
+  across reloads and character switches. Values already matching the requested
+  mode are not acquired. Graphics changes enforced while enabled establish new
+  restoration baselines. Disable restores only still-owned values, preserving
+  later external writes. Reset retains records until restoration completes.
+- Missing native graphics APIs or variables leave the enabled feature waiting;
+  failed writes report through the shared module error boundary. Failed restores
+  retain records for retry. No other addon's settings or assets are used.
+- Turning the mode off can require a full game restart to remove lingering
+  sparkles on Forever; `/reload` is insufficient according to the researched
+  addon's documentation. This client behavior requires installed-game validation.
 
 ### Spacers
 
@@ -234,6 +257,7 @@ lua CalmEUITweaks/tests/Spacers.lua
 lua CalmEUITweaks/tests/AnchorGap.lua
 lua CalmEUITweaks/tests/SpacerCorners.lua
 lua CalmEUITweaks/tests/BagItemLevel.lua
+lua CalmEUITweaks/tests/QuestLootSparkles.lua
 lua CalmEUITweaks/tests/WhatsTraining.lua
 lua CalmEUITweaks/tests/WhatsTrainingTheme.lua
 lua CalmEUITweaks/tests/Smoke.lua
@@ -241,6 +265,10 @@ lua CalmEUITweaks/tests/Smoke.lua
 
 Before a release, verify on the installed Forever/EUI build:
 
+- [ ] Confirm quest sparkles default off and are searchable on General. Enable
+  near a lootable quest object; check normal/raid outline changes, graphics
+  presets, reload, character switch, combat deferral, disable/reset restoration
+  and a full game restart. Confirm ore/herb approach effects are absent.
 - [ ] Open all six pages, use search, check status and confirm settings survive
   reload and remain independent of EUI profile changes. Check row packing at
   different UI scales and that saving/importing the first chat default enables

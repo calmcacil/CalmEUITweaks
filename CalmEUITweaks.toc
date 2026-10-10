@@ -22,6 +22,7 @@ functions\Spacers.lua
 functions\AnchorGap.lua
 functions\SpacerCorners.lua
 functions\BagItemLevel.lua
+functions\QuestLootSparkles.lua
 compatability\WhatsTraining.lua
 options\Chat.lua
 options\Pages.lua
