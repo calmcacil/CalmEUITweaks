@@ -26,7 +26,7 @@ reports again.
 
 | Store | Contents |
 | --- | --- |
-| `CalmUITweaksDB` | Account preferences, saved chat default and spacer geometry (`spacerLayouts`). |
+| `CalmUITweaksDB` | Account preferences, saved chat default, spacer geometry (`spacerLayouts`) and sparkle console-variable restoration records. |
 | `CalmUITweaksCharDB` | Macro ownership, chat apply records and corner baselines tied to native EUI anchors. |
 | EUI layout | Native anchor and size-match links, including offsets and growth pins. |
 
@@ -57,6 +57,55 @@ macros and existing non-spacer anchor offsets, and lets native spacer removal
 clean up links.
 
 ## Feature contracts
+
+### Quest loot sparkles
+
+- One account toggle on General defaults off. It enables the native quest-object
+  effect, with no gathering-node effects, custom textures or animation loop.
+- Enabled values are `outlineModeShowLootEffectWhenDisabled=1`,
+  `graphicsOutlineMode=0`, `OutlineEngineMode=0`, `raidGraphicsOutlineMode=0`
+  and `RAIDOutlineEngineMode=0`. Normal and raid outlines are disabled.
+- Login, world entry, variable readiness and relevant console-variable changes
+  apply settings through coalesced callbacks. Own writes and unrelated changes
+  schedule no work. No timers poll; disabled features release event subscriptions.
+  Combat-end subscription exists only while a change or restoration is pending.
+- `questLootSparkles.restore` retains previous and applied values account-wide
+  across reloads and character switches. Values already matching the requested
+  mode are not acquired. Graphics changes enforced while enabled establish new
+  restoration baselines. Disable restores only still-owned values, preserving
+  later external writes. Reset retains records until restoration completes.
+- Missing native graphics APIs or variables leave the enabled feature waiting;
+  failed writes report through the shared module error boundary. Failed restores
+  retain records for retry. No other addon's settings or assets are used.
+- Turning the mode off can require a full game restart to remove lingering
+  sparkles on Forever; `/reload` is insufficient according to the researched
+  addon's documentation. This client behavior requires installed-game validation.
+
+### Gathering sparkles
+
+- An independent account toggle on General defaults off. One reusable golden
+  glint cluster marks only the nearest soft-targeted ore vein or herb. NPCs,
+  quest objects and unrelated interactions are excluded. There is no range or
+  skill feedback, custom asset or quest-log scan.
+- Native cursor texture IDs, paths or atlases identify mining/herbalism targets.
+  Forbidden or unreadable targets/plates are skipped. The interaction plate is
+  resolved directly or through matching nameplate unit tokens.
+- Native alpha animation groups twinkle at fixed positions, stopping on target
+  loss, removal, pending combat changes or disable. Target/nameplate changes,
+  world entry, variable readiness and relevant console changes coalesce updates.
+  No Lua frame updates or polling run. Unrelated NPC plate events are ignored.
+- While enabled, `SoftTargetInteract=3`, `SoftTargetInteractRange=15`,
+  `SoftTargetInteractArc=2`, `SoftTargetInteractOnlyInRange=0`,
+  `SoftTargetIconInteract=1`, `SoftTargetIconGameObject=1` and
+  `SoftTargetLowPriorityIcons=1`. `SoftTargetNameplateInteract` is 1 only for
+  detected gathering nodes, otherwise 0. Interaction icons can affect other
+  objects. The actual detection radius is client-owned and unverified in game.
+- Both sparkle modules use the shared owned-console-variable helper.
+  `gatheringSparkles.restore` retains original values through owned nameplate
+  gating transitions, reloads, character changes and reset. Disable restores
+  only still-owned settings. Missing APIs/variables wait; failed writes report.
+  Combat-end is subscribed only while work is pending. Disabled idle features
+  have no subscriptions; pending restoration retains readiness events.
 
 ### Spacers
 
@@ -140,12 +189,28 @@ clean up links.
   and localized spell names. Left-click uses food/water; right-click conjures via
   a cast sequence. Updates defer in combat. Unowned or manually changed macros
   are not overwritten; disable, rename and reset do not delete macros.
-- SimpleItemLevel controls filtering/style for labels and upgrade markers in
-  EUI inventory, reagent bags and bank. Standard SIL settings changes reconcile
-  the bridge; direct external database writes wait for a normal refresh.
-  Unchanged button and parent setters retain cached or pending item results.
-  Item identity, link, quality, parent, location and settings changes invalidate
-  those results. Hidden or disabled scopes do not schedule setter-driven refreshes.
+- Native bag item levels replace the former SimpleItemLevel bridge without
+  requiring SIL. The existing `simpleItemLevel` preference key and scope switches
+  remain intact. Equipment labels use Blizzard's detailed item level, quality
+  color, NumberFontNormal at top right, and an upgrade arrow at top left.
+- Comparisons use equipped item levels only, not stats or class usability.
+  Rings/trinkets use the lower slot, one-handed weapons use main hand,
+  two-handed weapons must beat both slots, and offhand items are excluded while
+  a two-handed weapon is equipped. Empty slots count as zero; unknown equipped
+  data does not. Above-player-level upgrades have red arrows.
+- Grey/white candidates only receive arrows for empty matching slots, even if
+  their item level exceeds equipped gear. Either paired ring/trinket slot may
+  be empty; two-handed candidates require both weapon slots empty. The offhand
+  exclusion still applies. Green-or-better comparisons and all labels are unchanged.
+- Bag opening, content events, equipment changes while visible and scope changes
+  trigger coalesced updates. Unchanged results and pending item callbacks are
+  reused. Native texture, quality and refresh writes do no item queries.
+  Equipped item levels are cached per open/equipment refresh. Item-data events
+  are subscribed only for pending equipped lookups; unrelated and duplicate
+  completions do not schedule work. Failed loads wait for a later normal refresh.
+  Hidden/disabled scopes do not scan or compare. Combat changes defer and
+  stale callbacks cannot repaint recycled buttons. Disable restores owned native
+  visibility without changing native text or SIL saved settings.
 - WhatsTraining matches text and inline colors to the native spellbook's current
   text color in EUI and Modern skins, using EUI's white default before native
   controls load. It recognizes both parchment and already-dark WT text, retains
@@ -217,7 +282,9 @@ lua CalmEUITweaks/tests/Chat.lua
 lua CalmEUITweaks/tests/Spacers.lua
 lua CalmEUITweaks/tests/AnchorGap.lua
 lua CalmEUITweaks/tests/SpacerCorners.lua
-lua CalmEUITweaks/tests/SimpleItemLevel.lua
+lua CalmEUITweaks/tests/BagItemLevel.lua
+lua CalmEUITweaks/tests/QuestLootSparkles.lua
+lua CalmEUITweaks/tests/GatheringSparkles.lua
 lua CalmEUITweaks/tests/WhatsTraining.lua
 lua CalmEUITweaks/tests/WhatsTrainingTheme.lua
 lua CalmEUITweaks/tests/Smoke.lua
@@ -225,6 +292,15 @@ lua CalmEUITweaks/tests/Smoke.lua
 
 Before a release, verify on the installed Forever/EUI build:
 
+- [ ] Confirm quest sparkles default off and are searchable on General. Enable
+  near a lootable quest object; check normal/raid outline changes, graphics
+  presets, reload, character switch, combat deferral, disable/reset restoration
+  and a full game restart. Confirm ore/herb approach effects are absent.
+- [ ] Enable gathering sparkles independently near ore/herbs. Confirm nameplate
+  anchoring, golden native animation, target loss/recycling and no NPC/quest
+  decorations. Walk between nodes and test world transitions, fallback plate
+  tokens, combat, reload, reset and restoration of prior soft-target settings.
+  Record and inspect the animation and transitions on the installed client.
 - [ ] Open all six pages, use search, check status and confirm settings survive
   reload and remain independent of EUI profile changes. Check row packing at
   different UI scales and that saving/importing the first chat default enables
@@ -239,6 +315,10 @@ Before a release, verify on the installed Forever/EUI build:
 - [ ] Check localized mage ranks, macro collisions, combat deferral, all bag/bank
   scopes, item loading, training pages in EUI/Modern skins, live skin changes,
   late spellbook loading and restoration when fixes or spellbook skins are disabled.
+- [ ] With SimpleItemLevel disabled, compare bag-open CPU usage against the bag
+  item-level switch off, including idle open bags and equipment/non-equipment
+  loot. Check paired rings/trinkets, weapon rules, pending equipped data, native
+  label restoration, scope switches, reload and combat transitions.
 - [ ] Compare training fonts, tab icons/selection, icon rings, dropdowns, page
   arrows and header lines with the native spellbook. Switch categories and
   reopen WT in both skins. Hover the class/weapon toggle and confirm stable FPS.

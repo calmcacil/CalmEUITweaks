@@ -382,8 +382,8 @@ test("late ADDON_LOADED is forwarded only after own settings initialize", functi
     s:event("ADDON_LOADED", "Before")
     equal(#module.addons, 0)
     s:initialize()
-    s:event("ADDON_LOADED", "SimpleItemLevel")
-    same(module.addons, { "SimpleItemLevel" })
+    s:event("ADDON_LOADED", "EllesmereUIBags")
+    same(module.addons, { "EllesmereUIBags" })
     equal(module.applied, 0)
     s:storageUnchanged()
 end)
@@ -649,7 +649,7 @@ end)
 
 test("apply requests debounce per module, wait for readiness, and honor cancellation", function()
     local s = core()
-    local macro, sil = s:module("mageMacro"), s:module("simpleItemLevel")
+    local macro, bags = s:module("mageMacro"), s:module("simpleItemLevel")
     s.ns.RequestApply("mageMacro")
     equal(#s.timers, 0)
     s:initialize():login()
@@ -660,7 +660,7 @@ test("apply requests debounce per module, wait for readiness, and honor cancella
     equal(macro.applied, 1)
     s:flush()
     equal(macro.applied, 2)
-    equal(sil.applied, 2)
+    equal(bags.applied, 2)
     s.ns.RequestApply("mageMacro")
     s.ns.ready = false
     s:flush()
@@ -965,10 +965,12 @@ local function checkVisiblePages(s)
     end
     local bindings = {
         ["Mage food / water macro"] = { "mageMacro", "enabled" },
-        ["SimpleItemLevel bridge"] = { "simpleItemLevel", "enabled" },
+        ["Bag item levels"] = { "simpleItemLevel", "enabled" },
         ["WhatsTraining spellbook theme"] = { "whatsTraining", "enabled" },
+        ["Quest loot sparkles"] = { "questLootSparkles", "enabled" },
+        ["Ore / herb sparkles"] = { "gatheringSparkles", "enabled" },
         ["Maintain character macro"] = { "mageMacro", "enabled" },
-        ["Enable bag / bank bridge"] = { "simpleItemLevel", "enabled" },
+        ["Enable bag / bank item levels"] = { "simpleItemLevel", "enabled" },
         ["Inventory bags"] = { "simpleItemLevel", "inventory" },
         ["Reagent bags"] = { "simpleItemLevel", "reagent" },
         ["Bank"] = { "simpleItemLevel", "bank" },

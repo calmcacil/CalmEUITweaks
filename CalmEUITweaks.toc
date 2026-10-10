@@ -6,12 +6,13 @@
 ## Version: 0.2.1
 # x-release-please-end
 ## RequiredDeps: EllesmereUI
-## OptionalDeps: SimpleItemLevel, WhatsTraining, EllesmereUIBags
+## OptionalDeps: WhatsTraining, EllesmereUIBags
 ## SavedVariables: CalmUITweaksDB
 ## SavedVariablesPerCharacter: CalmUITweaksCharDB
 
 core\Bootstrap.lua
 core\Settings.lua
+core\CVars.lua
 core\Lifecycle.lua
 core\AnchorEvents.lua
 core\Commands.lua
@@ -21,7 +22,9 @@ functions\Chat.lua
 functions\Spacers.lua
 functions\AnchorGap.lua
 functions\SpacerCorners.lua
-compatability\SimpleItemLevel.lua
+functions\BagItemLevel.lua
+functions\QuestLootSparkles.lua
+functions\GatheringSparkles.lua
 compatability\WhatsTraining.lua
 options\Chat.lua
 options\Pages.lua
