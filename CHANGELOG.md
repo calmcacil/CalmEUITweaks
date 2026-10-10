@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.2.1...v0.3.0) (2026-10-10)
+
+
+### Features
+
+* add native bag upgrades and optional loot sparkles ([#6](https://github.com/calmcacil/CalmEUITweaks/issues/6)) ([e5fde83](https://github.com/calmcacil/CalmEUITweaks/commit/e5fde8300ae6d80cc7700814c593e36227506619))
+
+
+### Bug Fixes
+
+* **ci:** guard release App configuration ([#5](https://github.com/calmcacil/CalmEUITweaks/issues/5)) ([27d74a8](https://github.com/calmcacil/CalmEUITweaks/commit/27d74a82d02dd487331be98103895f9a406c6e2b))
+
 ## [0.2.1](https://github.com/calmcacil/CalmEUITweaks/compare/v0.2.0...v0.2.1) (2026-10-08)
 
 
