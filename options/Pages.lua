@@ -99,6 +99,8 @@ local function BuildPage(page, parent, y)
             "Themes the WhatsTraining tab to match the active EUI spellbook skin, including fonts, controls and backgrounds. Disabling restores owned changes."),
             Toggle("questLootSparkles", "enabled", "Quest loot sparkles",
                 "Enables native quest-object sparkles by disabling normal and raid outlines. Off by default. Disabling restores owned graphics settings; restart the game to remove lingering sparkles."))
+        Row(Toggle("gatheringSparkles", "enabled", "Ore / herb sparkles",
+            "Adds golden sparkles to the nearest soft-targeted ore vein or herb. Enables interaction targeting and icons. Fixed appearance with no range or skill feedback. Off by default."))
     elseif page == "Mage Macro" then
         Section("MAGE FOOD AND WATER")
         Row(Toggle("mageMacro", "enabled", "Maintain character macro",

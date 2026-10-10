@@ -3,7 +3,7 @@
 A companion addon for [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/)
 on WoW Forever. It adds spacer anchors, automatic anchor gaps, shared chat
 setups, a mage food/water macro, bag item levels and potential upgrade markers,
-quest-object sparkles, and a compatibility fix for WhatsTraining.
+quest-object and gathering sparkles, and a compatibility fix for WhatsTraining.
 
 ## Requirements and installation
 
@@ -28,6 +28,7 @@ Use `/calmtweaks status` to check dependencies and errors.
 | Bag item levels | Enabled for all scopes | Displays equipment item levels and potential upgrade arrows in EUI inventory, reagent bags and bank. |
 | WhatsTraining fix | Enabled | Themes the training tab to match EUI's spellbook, including backgrounds, fonts and controls. |
 | Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
+| Ore / herb sparkles | Off | Marks the nearest soft-targeted ore vein or herb with golden glints. |
 | Chat sharing | Manual; automatic updates off | Shares normal tabs, docking order, message groups and channel subscriptions. |
 | Spacer anchors | All four off | Adds invisible, resizable elements to EUI Unlock Mode. |
 | Player/Target corners | EUI Default | Aligns facing corners when these frames are anchored to a spacer. |
@@ -53,8 +54,8 @@ showing the spellbook applies pending theme changes.
 Enable **Quest loot sparkles** on **General** to use the client's native sparkle
 effect on lootable quest objects. This disables normal and raid outline
 highlighting. Graphics changes reapply the sparkle settings while enabled;
-there is no polling or custom animation. Ore and herb approach sparkles are
-not included.
+there is no polling or custom animation. Ore and herb sparkles use a separate
+toggle described below.
 
 Disabling or resetting the toggle restores graphics values changed by this
 feature when they still match its last writes. Previous values survive reloads
@@ -66,6 +67,25 @@ When replacing ForeverLootSparkles, turn its options off first, then disable
 that addon and restart the game. Console variables persist independently of
 addons. Calm UI Tweaks cannot recover graphics values previously changed by
 another addon; values already configured for sparkles are left as found.
+
+## Ore / herb sparkles
+
+Enable **Ore / herb sparkles** on **General** to add golden glints to the nearest
+soft-targeted ore vein or herb. This is independent of quest loot sparkles and
+does not change outline graphics. The effect uses native animations and target
+and nameplate events, with no Lua frame updates or polling.
+
+This simple version has a fixed appearance: no distance brightness or skill
+colors. It marks one nearby node, not every visible node. The requested targeting
+range is 15 yards; actual range and node detection depend on the Forever client.
+This feature still needs installed-game validation.
+
+The toggle enables soft interaction targeting and its icons, which can also
+affect interaction cues for other nearby objects. Interaction nameplates are
+requested only for detected gathering nodes. During pending combat changes the
+effect is hidden until combat ends. Disabling stops animations immediately and
+restores still-owned targeting settings outside combat; restoration records
+survive reloads, character switches and preference resets.
 
 ## Spacer anchors
 

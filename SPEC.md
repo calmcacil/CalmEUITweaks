@@ -26,7 +26,7 @@ reports again.
 
 | Store | Contents |
 | --- | --- |
-| `CalmUITweaksDB` | Account preferences, saved chat default, spacer geometry (`spacerLayouts`) and quest-sparkle graphics restoration records. |
+| `CalmUITweaksDB` | Account preferences, saved chat default, spacer geometry (`spacerLayouts`) and sparkle console-variable restoration records. |
 | `CalmUITweaksCharDB` | Macro ownership, chat apply records and corner baselines tied to native EUI anchors. |
 | EUI layout | Native anchor and size-match links, including offsets and growth pins. |
 
@@ -80,6 +80,32 @@ clean up links.
 - Turning the mode off can require a full game restart to remove lingering
   sparkles on Forever; `/reload` is insufficient according to the researched
   addon's documentation. This client behavior requires installed-game validation.
+
+### Gathering sparkles
+
+- An independent account toggle on General defaults off. One reusable golden
+  glint cluster marks only the nearest soft-targeted ore vein or herb. NPCs,
+  quest objects and unrelated interactions are excluded. There is no range or
+  skill feedback, custom asset or quest-log scan.
+- Native cursor texture IDs, paths or atlases identify mining/herbalism targets.
+  Forbidden or unreadable targets/plates are skipped. The interaction plate is
+  resolved directly or through matching nameplate unit tokens.
+- Native alpha animation groups twinkle at fixed positions, stopping on target
+  loss, removal, pending combat changes or disable. Target/nameplate changes,
+  world entry, variable readiness and relevant console changes coalesce updates.
+  No Lua frame updates or polling run. Unrelated NPC plate events are ignored.
+- While enabled, `SoftTargetInteract=3`, `SoftTargetInteractRange=15`,
+  `SoftTargetInteractArc=2`, `SoftTargetInteractOnlyInRange=0`,
+  `SoftTargetIconInteract=1`, `SoftTargetIconGameObject=1` and
+  `SoftTargetLowPriorityIcons=1`. `SoftTargetNameplateInteract` is 1 only for
+  detected gathering nodes, otherwise 0. Interaction icons can affect other
+  objects. The actual detection radius is client-owned and unverified in game.
+- Both sparkle modules use the shared owned-console-variable helper.
+  `gatheringSparkles.restore` retains original values through owned nameplate
+  gating transitions, reloads, character changes and reset. Disable restores
+  only still-owned settings. Missing APIs/variables wait; failed writes report.
+  Combat-end is subscribed only while work is pending. Disabled idle features
+  have no subscriptions; pending restoration retains readiness events.
 
 ### Spacers
 
@@ -258,6 +284,7 @@ lua CalmEUITweaks/tests/AnchorGap.lua
 lua CalmEUITweaks/tests/SpacerCorners.lua
 lua CalmEUITweaks/tests/BagItemLevel.lua
 lua CalmEUITweaks/tests/QuestLootSparkles.lua
+lua CalmEUITweaks/tests/GatheringSparkles.lua
 lua CalmEUITweaks/tests/WhatsTraining.lua
 lua CalmEUITweaks/tests/WhatsTrainingTheme.lua
 lua CalmEUITweaks/tests/Smoke.lua
@@ -269,6 +296,11 @@ Before a release, verify on the installed Forever/EUI build:
   near a lootable quest object; check normal/raid outline changes, graphics
   presets, reload, character switch, combat deferral, disable/reset restoration
   and a full game restart. Confirm ore/herb approach effects are absent.
+- [ ] Enable gathering sparkles independently near ore/herbs. Confirm nameplate
+  anchoring, golden native animation, target loss/recycling and no NPC/quest
+  decorations. Walk between nodes and test world transitions, fallback plate
+  tokens, combat, reload, reset and restoration of prior soft-target settings.
+  Record and inspect the animation and transitions on the installed client.
 - [ ] Open all six pages, use search, check status and confirm settings survive
   reload and remain independent of EUI profile changes. Check row packing at
   different UI scales and that saving/importing the first chat default enables
