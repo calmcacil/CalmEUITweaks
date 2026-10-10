@@ -6,7 +6,7 @@
 ## Version: 0.2.1
 # x-release-please-end
 ## RequiredDeps: EllesmereUI
-## OptionalDeps: SimpleItemLevel, WhatsTraining, EllesmereUIBags
+## OptionalDeps: WhatsTraining, EllesmereUIBags
 ## SavedVariables: CalmUITweaksDB
 ## SavedVariablesPerCharacter: CalmUITweaksCharDB
 
@@ -21,7 +21,7 @@ functions\Chat.lua
 functions\Spacers.lua
 functions\AnchorGap.lua
 functions\SpacerCorners.lua
-compatability\SimpleItemLevel.lua
+functions\BagItemLevel.lua
 compatability\WhatsTraining.lua
 options\Chat.lua
 options\Pages.lua

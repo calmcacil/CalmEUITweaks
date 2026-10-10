@@ -140,12 +140,28 @@ clean up links.
   and localized spell names. Left-click uses food/water; right-click conjures via
   a cast sequence. Updates defer in combat. Unowned or manually changed macros
   are not overwritten; disable, rename and reset do not delete macros.
-- SimpleItemLevel controls filtering/style for labels and upgrade markers in
-  EUI inventory, reagent bags and bank. Standard SIL settings changes reconcile
-  the bridge; direct external database writes wait for a normal refresh.
-  Unchanged button and parent setters retain cached or pending item results.
-  Item identity, link, quality, parent, location and settings changes invalidate
-  those results. Hidden or disabled scopes do not schedule setter-driven refreshes.
+- Native bag item levels replace the former SimpleItemLevel bridge without
+  requiring SIL. The existing `simpleItemLevel` preference key and scope switches
+  remain intact. Equipment labels use Blizzard's detailed item level, quality
+  color, NumberFontNormal at top right, and an upgrade arrow at top left.
+- Comparisons use equipped item levels only, not stats or class usability.
+  Rings/trinkets use the lower slot, one-handed weapons use main hand,
+  two-handed weapons must beat both slots, and offhand items are excluded while
+  a two-handed weapon is equipped. Empty slots count as zero; unknown equipped
+  data does not. Above-player-level upgrades have red arrows.
+- Grey/white candidates only receive arrows for empty matching slots, even if
+  their item level exceeds equipped gear. Either paired ring/trinket slot may
+  be empty; two-handed candidates require both weapon slots empty. The offhand
+  exclusion still applies. Green-or-better comparisons and all labels are unchanged.
+- Bag opening, content events, equipment changes while visible and scope changes
+  trigger coalesced updates. Unchanged results and pending item callbacks are
+  reused. Native texture, quality and refresh writes do no item queries.
+  Equipped item levels are cached per open/equipment refresh. Item-data events
+  are subscribed only for pending equipped lookups; unrelated and duplicate
+  completions do not schedule work. Failed loads wait for a later normal refresh.
+  Hidden/disabled scopes do not scan or compare. Combat changes defer and
+  stale callbacks cannot repaint recycled buttons. Disable restores owned native
+  visibility without changing native text or SIL saved settings.
 - WhatsTraining matches text and inline colors to the native spellbook's current
   text color in EUI and Modern skins, using EUI's white default before native
   controls load. It recognizes both parchment and already-dark WT text, retains
@@ -217,7 +233,7 @@ lua CalmEUITweaks/tests/Chat.lua
 lua CalmEUITweaks/tests/Spacers.lua
 lua CalmEUITweaks/tests/AnchorGap.lua
 lua CalmEUITweaks/tests/SpacerCorners.lua
-lua CalmEUITweaks/tests/SimpleItemLevel.lua
+lua CalmEUITweaks/tests/BagItemLevel.lua
 lua CalmEUITweaks/tests/WhatsTraining.lua
 lua CalmEUITweaks/tests/WhatsTrainingTheme.lua
 lua CalmEUITweaks/tests/Smoke.lua
@@ -239,6 +255,10 @@ Before a release, verify on the installed Forever/EUI build:
 - [ ] Check localized mage ranks, macro collisions, combat deferral, all bag/bank
   scopes, item loading, training pages in EUI/Modern skins, live skin changes,
   late spellbook loading and restoration when fixes or spellbook skins are disabled.
+- [ ] With SimpleItemLevel disabled, compare bag-open CPU usage against the bag
+  item-level switch off, including idle open bags and equipment/non-equipment
+  loot. Check paired rings/trinkets, weapon rules, pending equipped data, native
+  label restoration, scope switches, reload and combat transitions.
 - [ ] Compare training fonts, tab icons/selection, icon rings, dropdowns, page
   arrows and header lines with the native spellbook. Switch categories and
   reopen WT in both skins. Hover the class/weapon toggle and confirm stable FPS.

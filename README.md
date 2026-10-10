@@ -2,15 +2,15 @@
 
 A companion addon for [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/)
 on WoW Forever. It adds spacer anchors, automatic anchor gaps, shared chat
-setups, a mage food/water macro, and compatibility fixes for SimpleItemLevel
-and WhatsTraining.
+setups, a mage food/water macro, bag item levels and potential upgrade markers,
+and a compatibility fix for WhatsTraining.
 
 ## Requirements and installation
 
 - WoW Forever, interface version `16001`. Other clients have not been validated.
 - EllesmereUI with plugin API version 1 or later.
-- Optional: SimpleItemLevel, WhatsTraining and EllesmereUIBags for their
-  compatibility features.
+- Optional: WhatsTraining for the spellbook theme and EllesmereUIBags for bag
+  item levels.
 
 Place the files in `Interface/AddOns/CalmEUITweaks/`, with `CalmEUITweaks.toc`
 directly inside that folder. Rename a GitHub download's extracted folder if
@@ -25,7 +25,7 @@ Use `/calmtweaks status` to check dependencies and errors.
 | Feature | Default | Purpose |
 | --- | --- | --- |
 | Mage macro | Enabled | Maintains a character macro using supported known food/water ranks. |
-| SimpleItemLevel bridge | Enabled for all scopes | Displays SIL item levels and upgrade markers in EUI inventory, reagent bags and bank. |
+| Bag item levels | Enabled for all scopes | Displays equipment item levels and potential upgrade arrows in EUI inventory, reagent bags and bank. |
 | WhatsTraining fix | Enabled | Themes the training tab to match EUI's spellbook, including backgrounds, fonts and controls. |
 | Chat sharing | Manual; automatic updates off | Shares normal tabs, docking order, message groups and channel subscriptions. |
 | Spacer anchors | All four off | Adds invisible, resizable elements to EUI Unlock Mode. |
@@ -38,9 +38,12 @@ SharedMedia addon; Calm UI Tweaks does not include them.
 
 The addon uses no `OnUpdate` handlers or repeating tickers. Anchor changes use
 native EUI notifications and secure placement hooks; disabled features release
-their event subscriptions. The bag bridge skips hidden/disabled scopes, reuses
-unchanged item results, and filters item-data notifications to tracked items.
-Repeated setters for unchanged bag items retain cached or pending results.
+their event subscriptions. The bag display skips hidden/disabled scopes and
+reuses unchanged item results.
+Opening bags and bag/bank content events trigger updates; equipment changes
+refresh comparisons while bags are visible. Repeated native texture, quality and
+refresh calls do no item queries. Equipped item-data notifications are subscribed
+only while a requested lookup is pending.
 Training theme passes skip the hidden spellbook and unchanged native font writes;
 showing the spellbook applies pending theme changes.
 
@@ -140,7 +143,7 @@ An existing unowned macro is not overwritten. Choose a free name if there is
 a collision. Editing an owned macro suspends maintenance; disabling or
 renaming the feature does not delete macros.
 
-The **Compatibility** page controls the SimpleItemLevel bag/bank scopes and
+The **Compatibility** page controls bag/bank item-level scopes and
 WhatsTraining theme fix. The training tab inherits the native spellbook's
 backdrop and dim page artwork, so EUI and Modern skins keep their exact
 background, color and opacity. Its separate page coverings are suppressed,
@@ -167,8 +170,19 @@ unavailable and muted text retain
 WhatsTraining's status tones. Before the spellbook loads, text uses EUI's white
 default. Disabling the fix or spellbook skin restores owned visual changes.
 
-SimpleItemLevel remains responsible for filtering and style. Disabling a fix
-releases its owned visual changes; protected changes
+Bag item levels use Blizzard's native item API and do not require SimpleItemLevel.
+Labels show equipment item levels in the top right; potential upgrade arrows
+appear in the top left. Rings and trinkets compare against the lower equipped
+slot. One-handed weapons compare against main hand; two-handed weapons must beat
+both weapon slots. Shields and offhand items receive no arrow while a two-handed
+weapon is equipped. Empty slots count as zero; unknown equipped data waits to load.
+Grey/white items receive arrows only for empty matching slots. For two-handed
+weapons, both weapon slots must be empty. Green-or-better items keep the normal
+item-level comparison. Item-level labels remain visible at every quality.
+These arrows compare item level only, without class usability or stat weighting.
+An arrow is red when the item requires a higher player level. SimpleItemLevel's
+appearance and filtering settings no longer control this display. Existing scope
+preferences remain saved. Disabling releases owned visuals; protected changes
 wait until combat ends.
 
 ## Commands and saved settings

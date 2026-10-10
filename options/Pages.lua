@@ -93,8 +93,8 @@ local function BuildPage(page, parent, y)
         Section("PERSONAL TWEAKS")
         Row(Toggle("mageMacro", "enabled", "Mage food / water macro",
             "Maintains a character macro for known food and water ranks. Configure it on the Mage Macro tab."),
-            Toggle("simpleItemLevel", "enabled", "SimpleItemLevel bridge",
-                "Shows SimpleItemLevel labels in EUI bags and bank. Configure scopes on the Compatibility tab."))
+            Toggle("simpleItemLevel", "enabled", "Bag item levels",
+                "Shows item levels and potential upgrades in EUI bags and bank. Configure scopes on the Compatibility tab."))
         Row(Toggle("whatsTraining", "enabled", "WhatsTraining spellbook theme",
             "Themes the WhatsTraining tab to match the active EUI spellbook skin, including fonts, controls and backgrounds. Disabling restores owned changes."))
     elseif page == "Mage Macro" then
@@ -104,15 +104,15 @@ local function BuildPage(page, parent, y)
         Text(nil, function() return "Macro name: " .. ns.GetSettings("mageMacro").name end)
         Text("Rename with /calmtweaks macro-name <name>. Choose a free name; existing or manually edited macros are never overwritten.")
     elseif page == "Compatibility" then
-        Section("SIMPLEITEMLEVEL")
-        Row(Toggle("simpleItemLevel", "enabled", "Enable bag / bank bridge",
-            "Requires SimpleItemLevel and EUI Bags. Appearance, filters and upgrade rules are controlled by SimpleItemLevel."),
+        Section("BAG ITEM LEVELS")
+        Row(Toggle("simpleItemLevel", "enabled", "Enable bag / bank item levels",
+            "Requires EUI Bags. Arrows mark higher item level than equipped gear, not better class stats."),
             Toggle("simpleItemLevel", "inventory", "Inventory bags",
-                "Show SimpleItemLevel labels in normal inventory bags when the bridge is enabled."))
+                "Show equipment item levels in normal inventory bags when bag item levels are enabled."))
         Row(Toggle("simpleItemLevel", "reagent", "Reagent bags",
-            "Show SimpleItemLevel labels in reagent bags when the bridge is enabled."),
+            "Show equipment item levels in reagent bags when bag item levels are enabled."),
             Toggle("simpleItemLevel", "bank", "Bank",
-                "Show SimpleItemLevel labels in bank bags when the bridge is enabled."))
+                "Show equipment item levels in bank bags when bag item levels are enabled."))
         Spacer()
         Section("WHATSTRAINING")
         Row(Toggle("whatsTraining", "enabled", "Match spellbook theme",
