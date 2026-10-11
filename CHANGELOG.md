@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.3.0...v0.4.0) (2026-10-11)
+
+
+### Features
+
+* standardize macro providers and EUI settings ([#8](https://github.com/calmcacil/CalmEUITweaks/issues/8)) ([a825615](https://github.com/calmcacil/CalmEUITweaks/commit/a825615261bba00e9796a48722894c4bf1e3be40))
+
 ## [0.3.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.2.1...v0.3.0) (2026-10-10)
 
 
