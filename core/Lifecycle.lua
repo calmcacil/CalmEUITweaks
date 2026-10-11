@@ -40,5 +40,6 @@ events:SetScript("OnEvent", function(_, event, loadedAddon)
         if ns.optionsError then ns.Print(ns.optionsError) end
     elseif ns.initialized then
         for _, key in ipairs(ns.moduleOrder) do ns.CallModule(key, "OnAddonLoaded", loadedAddon) end
+        if ns.OnOptionsAddonLoaded then ns.OnOptionsAddonLoaded(loadedAddon) end
     end
 end)

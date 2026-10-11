@@ -134,6 +134,9 @@ Under **Anchors**, enable **Automatic anchor gap** before creating links in
 Unlock Mode. Set Top, Bottom, Left and Right independently from 0 to 10
 physical pixels. Each defaults to 2; zero gives flush placement.
 
+The side sliders are grouped as Top/Bottom and Left/Right. Enable automatic
+anchor gaps to edit them; turning automation off retains their saved values.
+
 The gap moves the child away from the target on only the attached side's axis:
 TOP moves up, BOTTOM down, LEFT left and RIGHT right. The other axis keeps its
 alignment. For action/CDM bar corner presets:
@@ -183,9 +186,29 @@ An existing unowned macro is not overwritten. Choose a free name if there is
 a collision. Editing an owned macro suspends maintenance; disabling or
 renaming the feature does not delete macros.
 
+Use **Rename Macro** beside the maintenance toggle on **Mage Macro** to choose
+a free name. The page shows the current name and live status. Renaming is
+available after login, outside combat, and changes the account-wide name
+preference. `/calmtweaks macro-name <name>` remains available.
+
+The macro uses the highest supported ranks you have learned, with localized
+conjure spell names. Both food and water spells must be learned. Each right-click
+advances the conjure sequence, which resets after 10 seconds without use. Drag
+the character macro onto an action bar to use it. If localized spell data remains
+unavailable, turn the feature off and on to retry loading it.
+
+For new macro additions, follow the [provider contract](specs/macro-providers/PRODUCT.md)
+and [registration checklist](specs/macro-providers/TECH.md), starting from
+[`docs/templates/MacroProvider.lua`](docs/templates/MacroProvider.lua).
+
 The **Compatibility** page controls bag/bank item-level scopes and
-WhatsTraining theme fix. The training tab inherits the native spellbook's
-backdrop and dim page artwork, so EUI and Modern skins keep their exact
+WhatsTraining theme fix, with live status for each feature. Bag scope controls
+are disabled while bag item levels are off and retain your choices. On both
+General and Compatibility, bag controls are greyed out until EllesmereUIBags
+is loaded, and the training toggle is greyed out until WhatsTraining is loaded.
+Tooltips identify the required addon; saved preferences remain unchanged.
+The training tab inherits the native spellbook's backdrop and dim page artwork,
+so EUI and Modern skins keep their exact
 background, color and opacity. Its separate page coverings are suppressed,
 and native spells and controls beneath the tab are suppressed only while it is
 open. Switching back immediately restores the native content.
