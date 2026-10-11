@@ -74,6 +74,7 @@ local function sandbox(options)
     options = options or {}
     local s = { ns = {}, frames = {}, labels = {}, rows = {}, sections = {}, timers = {},
         messages = {}, errors = {}, combat = false, loggedIn = false }
+    s.loadedAddons = copy(options.loadedAddons or { EllesmereUIBags = true, WhatsTraining = true })
     local env = setmetatable({}, { __index = _G })
     s.env = env
     s.ns.Chat = { GetSummary = function() return "Default saved: Not saved\nApplied to this character: Never\nNot applied" end }
@@ -86,6 +87,10 @@ local function sandbox(options)
     s.storageBefore = { EUIDB = copy(env.EUIDB), EllesmereUIDB = copy(env.EllesmereUIDB) }
     if not options.noHost then env.EllesmereUI = host() end
     env.SlashCmdList = {}
+    env.C_AddOns = { IsAddOnLoaded = function(name, ...)
+        equal(select("#", ...), 0, "addon load check must be a function call")
+        return s.loadedAddons[name] == true
+    end }
     env.MAX_MACRO_NAME_LENGTH = 16
     env.print = function(message) s.messages[#s.messages + 1] = message end
     env.geterrorhandler = function()
@@ -1109,11 +1114,241 @@ test("cached macro name follows settings changes without rebuilding", function()
     s:build("Mage Macro")
     local macroName = s:findLabel("Macro name:")
     equal(s.ns.SetSetting("mageMacro", "name", "Changed Name"), true)
-    equal(macroName.text, "Macro name: Changed Name")
+    equal(macroName.text, "Macro name: Changed Name\nStatus: " .. s.ns.GetStatus("mageMacro"))
     s.ns.db.mageMacro.name = "Restored Name"
     s.pluginRegistration.modules[1].onPageCacheRestore()
-    equal(macroName.text, "Macro name: Restored Name")
+    equal(macroName.text, "Macro name: Restored Name\nStatus: " .. s.ns.GetStatus("mageMacro"))
     s:storageUnchanged()
+end)
+
+test("macro rename uses the native input popup and shared settings validation", function()
+    local s = optionsFixture():initialize():login()
+    local eui = s.env.EllesmereUI
+    local ownership = { Keep = { lastGeneratedBody = "owned" } }
+    s.ns.charDB.mageMacro.ownedMacros = ownership
+    s:build("Mage Macro")
+    equal(#s.rows, 1)
+    local toggle, rename = s.rows[1].left, s.rows[1].right
+    equal(toggle.type, "toggle")
+    equal(rename.type, "button")
+    equal(rename.text, "Rename Macro")
+    equal(rename.disabled(), false)
+    local popup, refreshes = nil, 0
+    eui.ShowInputPopup = function(self, cfg)
+        equal(self, eui, "input popup must use a method call")
+        popup = cfg
+    end
+    eui.RefreshPage = function(self, force)
+        equal(self, eui)
+        equal(force, nil, "rename must refresh cached widgets without rebuilding")
+        refreshes = refreshes + 1
+    end
+    rename.onClick()
+    equal(popup.initialText, "Mage FoodWater")
+    equal(popup.maxLetters, 16)
+    equal(popup.cancelText, "Cancel")
+    equal(s.ns.db.mageMacro.name, "Mage FoodWater", "opening or cancelling must not rename")
+    popup.onConfirm("  My FoodWater  ")
+    equal(s.ns.db.mageMacro.name, "My FoodWater")
+    contains(s:findLabel("Macro name:").text, "Macro name: My FoodWater")
+    contains(s.messages[#s.messages], "previous macros are left intact")
+    equal(s.ns.charDB.mageMacro.ownedMacros, ownership)
+    same(ownership, { Keep = { lastGeneratedBody = "owned" } })
+    equal(refreshes, 1)
+    popup.onConfirm("bad|name")
+    equal(s.ns.db.mageMacro.name, "My FoodWater")
+    contains(s.messages[#s.messages], "Macro names must be plain text")
+    equal(refreshes, 1, "rejected names cause no refresh or writes")
+    s.combat = true
+    equal(rename.disabled(), true)
+    s.combat = false
+    s.ns.ready = false
+    equal(rename.disabled(), true)
+    equal(#s.rows, 1, "rename uses the existing page cache")
+    s:storageUnchanged()
+end)
+
+test("macro and compatibility status follows updates and cached-page restoration", function()
+    local s = optionsFixture():initialize():login()
+    s.ns.SetStatus("simpleItemLevel", "Bag initial")
+    s.ns.SetStatus("whatsTraining", "Training initial")
+    s:build("Mage Macro")
+    s:build("Compatibility")
+    local macro = s:findLabel("Macro name:")
+    local bags = s:findLabel("Status: Bag initial", true)
+    local training = s:findLabel("Status: Training initial", true)
+    s.ns.SetStatus("mageMacro", "Waiting for localized spells.")
+    s.ns.SetStatus("simpleItemLevel", "Waiting for EUI Bags.")
+    s.ns.SetStatus("whatsTraining", "Waiting for WhatsTraining.")
+    contains(macro.text, "Status: Waiting for localized spells.")
+    equal(bags.text, "Status: Waiting for EUI Bags.")
+    equal(training.text, "Status: Waiting for WhatsTraining.")
+    s.ns.statuses.mageMacro = "Ready"
+    s.pluginRegistration.modules[1].onPageCacheRestore("Mage Macro")
+    contains(macro.text, "Status: Ready")
+    s:storageUnchanged()
+end)
+
+test("dependent scopes and gap sliders refresh in place with their parent switch", function()
+    for _, config in ipairs({
+        { page = "Compatibility", key = "simpleItemLevel", kind = "toggle", count = 3 },
+        { page = "Anchors", key = "anchorGap", kind = "slider", count = 4 },
+    }) do
+        local s = optionsFixture():initialize():login()
+        s:build(config.page)
+        local states, dependent = {}, {}
+        local eui = s.env.EllesmereUI
+        local function Dependent(cfg)
+            if config.kind == "slider" then return cfg.type == "slider" end
+            return cfg.text == "Inventory bags" or cfg.text == "Reagent bags" or cfg.text == "Bank"
+        end
+        local function RefreshControls(self, force)
+            equal(self, eui)
+            equal(force, nil, "control changes must not rebuild the page")
+            for _, row in ipairs(s.rows) do
+                for _, cfg in ipairs({ row.left, row.right }) do
+                    if Dependent(cfg) then
+                        states[cfg] = cfg.disabled()
+                    end
+                end
+            end
+        end
+        eui.RefreshPage = RefreshControls
+        for _, row in ipairs(s.rows) do
+            for _, cfg in ipairs({ row.left, row.right }) do
+                if Dependent(cfg) then dependent[#dependent + 1] = cfg end
+            end
+        end
+        equal(#dependent, config.count)
+        local parent = s.rows[1].left
+        local before, rows = copy(s.ns.db), #s.rows
+        parent.setValue(false)
+        for _, cfg in ipairs(dependent) do equal(states[cfg], true) end
+        parent.setValue(true)
+        for _, cfg in ipairs(dependent) do equal(states[cfg], false) end
+        s.ns.db[config.key].enabled = false
+        s.pluginRegistration.modules[1].onPageCacheRestore(config.page)
+        for _, cfg in ipairs(dependent) do equal(states[cfg], true) end
+        s.ns.db[config.key].enabled = before[config.key].enabled
+        same(s.ns.db, before, "enabling/disabling must preserve dependent preferences")
+        equal(#s.rows, rows)
+        s:storageUnchanged()
+    end
+end)
+
+test("missing compatibility addons grey out both pages without changing preferences", function()
+    for _, loaded in ipairs({ {}, { EllesmereUIBags = true }, { WhatsTraining = true },
+        { EllesmereUIBags = true, WhatsTraining = true } }) do
+        local s = optionsFixture({ loadedAddons = loaded }):initialize():login()
+        local before, charBefore = copy(s.ns.db), copy(s.ns.charDB)
+        s:build("General")
+        s:build("Compatibility")
+        local dependencies = {
+            ["Bag item levels"] = "EllesmereUIBags",
+            ["Enable bag / bank item levels"] = "EllesmereUIBags",
+            ["Inventory bags"] = "EllesmereUIBags",
+            ["Reagent bags"] = "EllesmereUIBags",
+            ["Bank"] = "EllesmereUIBags",
+            ["WhatsTraining spellbook theme"] = "WhatsTraining",
+            ["Match spellbook theme"] = "WhatsTraining",
+        }
+        local checked = 0
+        for _, row in ipairs(s.rows) do
+            for _, cfg in ipairs({ row.left, row.right }) do
+                local dependency = dependencies[cfg.text]
+                if dependency then
+                    equal(cfg.disabled(), loaded[dependency] ~= true, cfg.text)
+                    contains(cfg.disabledTooltip, dependency, "disabled tooltip must identify the dependency")
+                    equal(cfg.getValue(), true, "greying a control must preserve its saved choice")
+                    checked = checked + 1
+                elseif cfg.type == "toggle" then
+                    equal(cfg.disabled, nil, "missing compatibility addons must not disable unrelated features")
+                end
+            end
+        end
+        equal(checked, 7)
+        same(s.ns.db, before)
+        same(s.ns.charDB, charBefore)
+        s:storageUnchanged()
+    end
+end)
+
+test("compatibility controls wait for a completed load and a usable addon API", function()
+    local s = optionsFixture():initialize():login()
+    s:build("Compatibility")
+    local bags = s.rows[1].left
+    s.env.C_AddOns.IsAddOnLoaded = function() return true, false end
+    equal(bags.disabled(), true, "loading is not yet available")
+    s.env.C_AddOns.IsAddOnLoaded = function() return true, true end
+    equal(bags.disabled(), false, "completed loading enables the control")
+    s.env.C_AddOns.IsAddOnLoaded = nil
+    equal(bags.disabled(), true, "missing API leaves dependency controls disabled")
+    s.env.C_AddOns = nil
+    equal(bags.disabled(), true, "missing namespace leaves dependency controls disabled")
+end)
+
+test("late compatibility addon loads refresh cached controls even when the patch is off", function()
+    local s = optionsFixture({ loadedAddons = {}, db = {
+        simpleItemLevel = { enabled = false }, whatsTraining = { enabled = false },
+    } }):initialize():login()
+    s:build("General")
+    s:build("Compatibility")
+    local eui, states, calls = s.env.EllesmereUI, {}, 0
+    eui.RefreshPage = function(self, force)
+        equal(self, eui)
+        equal(force, nil)
+        calls = calls + 1
+        for _, row in ipairs(s.rows) do
+            for _, cfg in ipairs({ row.left, row.right }) do
+                if cfg.disabled then states[cfg.text] = cfg.disabled() end
+            end
+        end
+    end
+    local before, rowCount = copy(s.ns.db), #s.rows
+    s:event("ADDON_LOADED", "UnrelatedAddon")
+    equal(calls, 0, "unrelated addons must not refresh the options")
+    s.loadedAddons.EllesmereUIBags = true
+    s:event("ADDON_LOADED", "EllesmereUIBags")
+    equal(calls, 1)
+    equal(states["Bag item levels"], false)
+    equal(states["Enable bag / bank item levels"], false)
+    equal(states["Inventory bags"], true, "scopes remain disabled while their parent is off")
+    equal(states["WhatsTraining spellbook theme"], true)
+    equal(states["Match spellbook theme"], true)
+    s.loadedAddons.WhatsTraining = true
+    s:event("ADDON_LOADED", "WhatsTraining")
+    equal(calls, 2)
+    equal(states["WhatsTraining spellbook theme"], false)
+    equal(states["Match spellbook theme"], false)
+    s.loadedAddons.WhatsTraining = nil
+    s.pluginRegistration.modules[1].onPageCacheRestore("Compatibility")
+    equal(states["Match spellbook theme"], true, "cached pages recheck dependency availability")
+    same(s.ns.db, before, "dependency loading never changes saved enabled states")
+    equal(#s.rows, rowCount)
+    s:storageUnchanged()
+end)
+
+test("native widget refresh failures report, recover, and permit later refreshes", function()
+    local s = optionsFixture():initialize():login()
+    local eui = s.env.EllesmereUI
+    s:build("Mage Macro")
+    local calls = 0
+    eui.RefreshPage = function(self, force)
+        equal(self, eui)
+        equal(force, nil)
+        calls = calls + 1
+        error("native refresh failed", 0)
+    end
+    s.ns.RefreshOptions()
+    contains(s.ns.GetStatus("options"), "native refresh failed")
+    s.ns.RefreshOptions()
+    equal(calls, 2, "a failed refresh cannot leave the reentry guard armed")
+    eui.RefreshPage = function(self)
+        equal(self, eui)
+        s.ns.RefreshOptions()
+    end
+    s.ns.RefreshOptions()
+    equal(s.ns.errors.options, nil, "native refresh recovers without recursive refresh")
 end)
 
 test("saving the first chat default refreshes native action buttons", function()

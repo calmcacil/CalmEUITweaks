@@ -16,8 +16,9 @@ Unavailable or rejected plugin APIs disable options and report a status reason;
 features retain their own dependency checks. Pages use native two-slot rows,
 filled left to right. Only the final row of a section may have an empty slot,
 using a fresh `EllesmereUI.BlankRowCfg()` for that slot. Hidden search builds use
-`EllesmereUI.IsSearchPrebuild()` to avoid custom label creation. Page callbacks
-refresh cached labels; chat actions also refresh native widget states in place.
+`EllesmereUI.IsSearchPrebuild()` to avoid custom label creation. Settings changes
+and page restoration refresh cached labels and native widget states in place,
+without rebuilding pages. Native refresh errors use the shared options boundary.
 Module and page errors are isolated and clear when the failing operation
 recovers. Repeated reports are deduplicated until recovery; a later recurrence
 reports again.
@@ -140,6 +141,8 @@ clean up links.
 
 - Automation defaults off. Each side defaults to 2 physical pixels and accepts
   integers from 0 to 10. A legacy shared value fills missing side defaults.
+- Anchors groups Top/Bottom and Left/Right sliders in two full native rows.
+  Sliders are disabled while automation is off and retain their saved values.
 - During Unlock Mode, new link records with zero separation receive the selected
   side's outward gap once. `PP.FromPixels` converts pixels to native coordinates.
 - TOP/BOTTOM affect only Y; LEFT/RIGHT affect only X. The alignment offset is
@@ -185,10 +188,28 @@ clean up links.
 
 ### Macro and compatibility
 
+- Macro providers follow [the provider contract](specs/macro-providers/PRODUCT.md)
+  and [the registration/addition guide](specs/macro-providers/TECH.md). New
+  providers supply metadata and text generation only; shared maintenance owns
+  lifecycle, spell-data requests, combat deferral, verified writes and ownership.
+  Use the development template in `docs/templates/MacroProvider.lua`.
 - The mage provider maintains a character macro using supported known rank tiers
   and localized spell names. Left-click uses food/water; right-click conjures via
   a cast sequence. Updates defer in combat. Unowned or manually changed macros
   are not overwritten; disable, rename and reset do not delete macros.
+- Mage Macro pairs its maintenance toggle with a native Rename Macro button.
+  The EUI input popup edits the account name preference through shared
+  validation, preserving existing macros and ownership. Rename is unavailable
+  before login and during combat. The current name and status refresh in place.
+- Compatibility shows live bag and training status. Bag scope toggles are
+  disabled while bag item levels are off, preserving their saved choices.
+- On General and Compatibility, bag feature/scope controls require loaded
+  EllesmereUIBags; the training toggle requires loaded WhatsTraining. Native
+  disabled states grey out unavailable controls with dependency tooltips, without
+  altering preferences. Dependency checks use `C_AddOns.IsAddOnLoaded`, prefer
+  its completed-load flag when present, and disable controls if the API is absent.
+  Relevant addon loads refresh cached controls through the existing lifecycle,
+  even when the patch preference is off. Unrelated loads do not refresh options.
 - Native bag item levels replace the former SimpleItemLevel bridge without
   requiring SIL. The existing `simpleItemLevel` preference key and scope switches
   remain intact. Equipment labels use Blizzard's detailed item level, quality
@@ -305,6 +326,14 @@ Before a release, verify on the installed Forever/EUI build:
   reload and remain independent of EUI profile changes. Check row packing at
   different UI scales and that saving/importing the first chat default enables
   Apply Default and Export Default immediately.
+- [ ] Use Rename Macro, cancel once, confirm a valid name, and reject an invalid
+  name. Check current name/status after page switching and reload. Toggle bag
+  item levels and anchor automation; dependent controls must refresh in place
+  and keep their saved values. Check rename availability through combat.
+- [ ] With EllesmereUIBags or WhatsTraining absent/disabled, confirm their
+  controls are greyed out on General and Compatibility, dependency tooltips are
+  clear, and saved preferences survive reload. If loaded later, controls must
+  refresh without rebuilding the page, including patches saved off.
 - [ ] Exercise all spacers, centered-bar chains, resizing, removal, Save/Discard,
   facing corners, scales, manual nudges and combat transitions.
 - [ ] Create side and action/CDM corner links with asymmetric gaps, including zero.

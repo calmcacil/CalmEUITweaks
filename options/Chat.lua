@@ -11,7 +11,6 @@ local function Run(action, success, ...)
     local ok, reason = ns.Chat[action](...)
     ns.Print(ok and success or reason or "Chat setup could not be updated.")
     if ns.RefreshOptions then ns.RefreshOptions() end
-    EllesmereUI:RefreshPage()
 end
 
 ns.ChatOptions = {

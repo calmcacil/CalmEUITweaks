@@ -3,6 +3,7 @@ local statusLabels = setmetatable({}, { __mode = "k" })
 local refreshing = false
 local failures = setmetatable({}, { __mode = "k" })
 local ownedError
+local dependencies = { simpleItemLevel = "EllesmereUIBags", whatsTraining = "WhatsTraining" }
 
 local function Failed(owner, err)
     failures[owner] = true
@@ -34,7 +35,26 @@ function ns.RefreshOptions()
     if refreshing then return end
     refreshing = true
     for label, getText in pairs(statusLabels) do UpdateText(label, nil, getText) end
+    local eui = _G.EllesmereUI
+    if eui and type(eui.RefreshPage) == "function" then
+        local ok, err = pcall(eui.RefreshPage, eui)
+        if ok then Recovered(eui) else Failed(eui, err) end
+    end
     refreshing = false
+end
+
+function ns.OnOptionsAddonLoaded(name)
+    for _, dependency in pairs(dependencies) do
+        if name == dependency then ns.RefreshOptions(); return end
+    end
+end
+
+local function DependencyLoaded(key)
+    if not C_AddOns or type(C_AddOns.IsAddOnLoaded) ~= "function" then return false end
+    local available, loaded = C_AddOns.IsAddOnLoaded(dependencies[key])
+    -- Prefer the completed-load flag on clients that also report loads in progress.
+    if loaded ~= nil then return loaded == true end
+    return available == true
 end
 
 local function Description(parent, y, text, getText, minimumHeight)
@@ -58,6 +78,13 @@ local function Toggle(moduleKey, key, text, tooltip)
         getValue = function() return ns.GetSettings(moduleKey)[key] end,
         setValue = function(value) ns.SetSetting(moduleKey, key, value) end,
     }
+end
+
+local function CompatibilityToggle(key, text, tooltip)
+    local cfg = Toggle(key, "enabled", text, tooltip)
+    cfg.disabled = function() return not DependencyLoaded(key) end
+    cfg.disabledTooltip = "Requires " .. dependencies[key] .. " to be installed, enabled, and loaded."
+    return cfg
 end
 
 local function BuildPage(page, parent, y)
@@ -93,9 +120,9 @@ local function BuildPage(page, parent, y)
         Section("PERSONAL TWEAKS")
         Row(Toggle("mageMacro", "enabled", "Mage food / water macro",
             "Maintains a character macro for known food and water ranks. Configure it on the Mage Macro tab."),
-            Toggle("simpleItemLevel", "enabled", "Bag item levels",
+            CompatibilityToggle("simpleItemLevel", "Bag item levels",
                 "Shows item levels and potential upgrades in EUI bags and bank. Configure scopes on the Compatibility tab."))
-        Row(Toggle("whatsTraining", "enabled", "WhatsTraining spellbook theme",
+        Row(CompatibilityToggle("whatsTraining", "WhatsTraining spellbook theme",
             "Themes the WhatsTraining tab to match the active EUI spellbook skin, including fonts, controls and backgrounds. Disabling restores owned changes."),
             Toggle("questLootSparkles", "enabled", "Quest loot sparkles",
                 "Enables native quest-object sparkles by disabling normal and raid outlines. Off by default. Disabling restores owned graphics settings; restart the game to remove lingering sparkles."))
@@ -104,23 +131,52 @@ local function BuildPage(page, parent, y)
     elseif page == "Mage Macro" then
         Section("MAGE FOOD AND WATER")
         Row(Toggle("mageMacro", "enabled", "Maintain character macro",
-            "Left-click uses food and water; right-click alternates conjure spells with a 10-second reset. Only owned macros are maintained; disabling leaves the macro intact."))
-        Text(nil, function() return "Macro name: " .. ns.GetSettings("mageMacro").name end)
-        Text("Rename with /calmtweaks macro-name <name>. Choose a free name; existing or manually edited macros are never overwritten.")
+            "Left-click uses food and water; right-click alternates conjure spells with a 10-second reset. Only owned macros are maintained; disabling leaves the macro intact."), {
+            type = "button", text = "Rename Macro", noCapture = true,
+            tooltip = "Choose the character macro name. Existing macros and manual edits are preserved. The name preference is account-wide.",
+            disabled = function() return not ns.ready or InCombatLockdown() end,
+            disabledTooltip = "Available after login and outside combat.",
+            onClick = function()
+                eui:ShowInputPopup({
+                    title = "Rename Mage Macro",
+                    message = "Choose a free macro name. Existing macros remain unchanged.",
+                    initialText = ns.GetSettings("mageMacro").name, maxLetters = 16,
+                    confirmText = "Rename Macro", cancelText = "Cancel",
+                    onConfirm = function(name)
+                        local ok, reason = ns.SetSetting("mageMacro", "name", name)
+                        ns.Print(ok and "Macro name changed; previous macros are left intact." or reason)
+                    end,
+                })
+            end,
+        })
+        Text(nil, function()
+            return "Macro name: " .. ns.GetSettings("mageMacro").name
+                .. "\nStatus: " .. ns.GetStatus("mageMacro")
+        end, 60)
     elseif page == "Compatibility" then
         Section("BAG ITEM LEVELS")
-        Row(Toggle("simpleItemLevel", "enabled", "Enable bag / bank item levels",
+        local function Scope(key, text, tooltip)
+            local cfg = Toggle("simpleItemLevel", key, text, tooltip)
+            cfg.disabled = function()
+                return not DependencyLoaded("simpleItemLevel") or not ns.GetSettings("simpleItemLevel").enabled
+            end
+            cfg.disabledTooltip = "Requires loaded EllesmereUIBags and enabled bag / bank item levels."
+            return cfg
+        end
+        Row(CompatibilityToggle("simpleItemLevel", "Enable bag / bank item levels",
             "Requires EUI Bags. Arrows mark higher item level than equipped gear, not better class stats."),
-            Toggle("simpleItemLevel", "inventory", "Inventory bags",
+            Scope("inventory", "Inventory bags",
                 "Show equipment item levels in normal inventory bags when bag item levels are enabled."))
-        Row(Toggle("simpleItemLevel", "reagent", "Reagent bags",
+        Row(Scope("reagent", "Reagent bags",
             "Show equipment item levels in reagent bags when bag item levels are enabled."),
-            Toggle("simpleItemLevel", "bank", "Bank",
+            Scope("bank", "Bank",
                 "Show equipment item levels in bank bags when bag item levels are enabled."))
+        Text(nil, function() return "Status: " .. ns.GetStatus("simpleItemLevel") end)
         Spacer()
         Section("WHATSTRAINING")
-        Row(Toggle("whatsTraining", "enabled", "Match spellbook theme",
+        Row(CompatibilityToggle("whatsTraining", "Match spellbook theme",
             "Themes the entire WhatsTraining spellbook tab to match EUI's fonts, controls and backgrounds while preserving training status colors. Disabling restores owned changes."))
+        Text(nil, function() return "Status: " .. ns.GetStatus("whatsTraining") end)
     elseif page == "Chat" then
         local function Button(text, action, tooltip, needsDefault)
             return {
@@ -145,7 +201,7 @@ local function BuildPage(page, parent, y)
         Section("EXPORT AND IMPORT")
         Row(Button("Export Default", "ExportDefault", "Copy the saved default as a portable chat setup string.", true),
             Button("Import Default", "ImportDefault", "Replace the saved default from a chat setup string. Does not immediately change this character's chat."))
-        Text("Includes normal tabs, docking order, message groups and channels. Position, size, fonts, backgrounds and voice transcription are not copied.")
+        Text("Shares normal tabs, docking order, message groups and channels. Window styling and history stay local.")
     elseif page == "Spacers" then
         Section("EDIT MODE SPACERS")
         local function SpacerToggle(index)
@@ -160,9 +216,7 @@ local function BuildPage(page, parent, y)
         end
         Row(SpacerToggle(1), SpacerToggle(2))
         Row(SpacerToggle(3), SpacerToggle(4))
-        Text("Enable up to four spacers, then open EUI Unlock Mode. Find them under Calm UI Tweaks and set their Width / Height to the gap you want.")
-        Text("Anchor a spacer between two frames using zero offsets. Its width sets LEFT / RIGHT gaps; its height sets TOP / BOTTOM gaps. See the README for a centered power bar example.")
-        Text("Spacer settings and geometry are account-wide. EUI owns the links in its current layout. Disabling removes those links; detach dependent frames first to preserve their placement.")
+        Text("Resize and attach spacers in EUI Unlock Mode. Disabling removes their links; detach dependent frames first. Settings and sizes are account-wide.")
         Spacer()
         Section("PLAYER / TARGET CORNER ALIGNMENT")
         local function Corner(unit, label)
@@ -192,7 +246,7 @@ local function BuildPage(page, parent, y)
             }
         end
         Row(Corner("player", "Player"), Corner("target", "Target"))
-        Text("Choose a frame corner facing the spacer after saving its anchor. New selections reset offsets so the corners touch; later size changes preserve manual nudges. EUI Default leaves the current link in place.")
+        Text("Choose the corner facing the spacer after saving its anchor. A new selection resets offsets; EUI Default keeps the current link.")
     elseif page == "Anchors" then
         Section("DEFAULT ANCHOR SPACING")
         local function Gap(side, label)
@@ -200,16 +254,18 @@ local function BuildPage(page, parent, y)
                 type = "slider", text = label .. " gap (pixels)", min = 0, max = 10, step = 1, noCapture = true,
                 getValue = function() return ns.GetSettings("anchorGap")[side] end,
                 setValue = function(value) ns.SetSetting("anchorGap", side, value) end,
+                disabled = function() return not ns.GetSettings("anchorGap").enabled end,
+                disabledTooltip = "Enable automatic anchor gap first.",
                 tooltip = "Spacing outside the target's " .. label:lower() .. " side, in physical pixels. Zero keeps new links flush. Applies to future anchors only.",
             }
         end
         Row(Toggle("anchorGap", "enabled", "Automatic anchor gap",
-            "Adds the side's default gap once to newly created flush edge anchors in EUI Unlock Mode. Existing links and manual offsets are preserved. Defaults off."),
-            Gap("top", "Top"))
-        Row(Gap("bottom", "Bottom"), Gap("left", "Left"))
-        Row(Gap("right", "Right"))
-        Text("Enable before creating links in EUI Unlock Mode. Zero keeps new links flush. Bar corner presets keep their edge alignment and move outward on the attached side only.")
-        Text("Existing links, manual offsets, center/diagonal anchors, screen edges and spacer links are preserved. Save keeps new gaps; Discard restores the layout. Disabling retains saved offsets.")
+            "Adds the side's default gap once to newly created flush edge anchors in EUI Unlock Mode. Existing links and manual offsets are preserved. Defaults off."))
+        Spacer()
+        Section("DEFAULT GAPS")
+        Row(Gap("top", "Top"), Gap("bottom", "Bottom"))
+        Row(Gap("left", "Left"), Gap("right", "Right"))
+        Text("Applies to new flush edge links in EUI Unlock Mode. Existing offsets stay unchanged. Save keeps new gaps; Discard restores the layout.")
     end
     return math.abs(y) + 12
 end

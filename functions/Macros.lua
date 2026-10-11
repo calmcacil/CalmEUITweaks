@@ -1,6 +1,46 @@
 local addonName, ns = ...
 local modules = {}
 
+ns.MacroSpells = {}
+
+local function IsKnown(spellID)
+    local checks = {
+        C_SpellBook and C_SpellBook.IsSpellKnownOrInSpellBook,
+        C_SpellBook and C_SpellBook.IsSpellKnown,
+        IsSpellKnown,
+        IsPlayerSpell,
+    }
+    -- Nil entries must not stop the fallback chain on older clients.
+    for i = 1, 4 do
+        local check = checks[i]
+        if check then
+            local ok, known = pcall(check, spellID)
+            if ok and known ~= nil then return not not known end
+        end
+    end
+    return false
+end
+
+function ns.MacroSpells.HighestKnown(tiers)
+    local level = UnitLevel("player") or 1
+    for _, tier in ipairs(tiers) do
+        if level >= tier.level and IsKnown(tier.spell) then return tier end
+    end
+end
+
+function ns.MacroSpells.Name(spellID)
+    if C_Spell and C_Spell.GetSpellInfo then
+        local ok, info = pcall(C_Spell.GetSpellInfo, spellID)
+        if ok and info and type(info.name) == "string" and info.name ~= "" then
+            return info.name
+        end
+    end
+    if GetSpellInfo then
+        local ok, name = pcall(GetSpellInfo, spellID)
+        if ok and type(name) == "string" and name ~= "" then return name end
+    end
+end
+
 local function ValidName(name)
     if type(name) ~= "string" or not name:find("%S") or name:find("%c") then
         return false, "Enter a nonempty macro name without control characters."
@@ -27,13 +67,18 @@ local function FindNamed(name, accountLimit, characterLimit)
     return matches
 end
 
--- Providers supply settingsKey, class, classLabel, defaultName and Build().
--- Build returns body, or nil, status message, optional missing spell IDs.
+-- Provider contract and addition checklist: specs/macro-providers/TECH.md.
 function ns.RegisterMacroProvider(id, provider)
-    assert(type(id) == "string" and not modules[id], "Duplicate or invalid macro provider")
+    assert(type(id) == "string" and id:find("%S") and not id:find("%c")
+        and not modules[id], "Duplicate or invalid macro provider")
     assert(type(provider) == "table" and type(provider.Build) == "function"
-        and type(provider.settingsKey) == "string" and type(provider.class) == "string"
-        and type(provider.classLabel) == "string" and type(provider.defaultName) == "string",
+        and type(provider.settingsKey) == "string" and provider.settingsKey:find("%S")
+        and not provider.settingsKey:find("%c")
+        and type(provider.class) == "string" and provider.class:find("%S")
+        and not provider.class:find("%c")
+        and type(provider.classLabel) == "string" and provider.classLabel:find("%S")
+        and not provider.classLabel:find("%c")
+        and ValidName(provider.defaultName),
         "Invalid macro provider contract")
 
     local Module = { asyncErrors = true }
@@ -266,7 +311,7 @@ function ns.RegisterMacroProvider(id, provider)
         return status
     end
 
-    modules[id] = Module
     ns.RegisterModule(key, Module)
+    modules[id] = Module
     return Module
 end
