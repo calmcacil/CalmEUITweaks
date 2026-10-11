@@ -68,7 +68,7 @@ def check_package(archive, version):
             require(parts and parts[0] == ADDON and ".." not in parts and "\\" not in name,
                     f"Invalid package path: {name}")
             if len(parts) > 1:
-                require(parts[1] not in {"tests", "scripts", "docs", "AGENTS.md", "SPEC.md", "VERSION",
+                require(parts[1] not in {"tests", "scripts", "docs", "specs", "AGENTS.md", "SPEC.md", "VERSION",
                                         "release-please-config.json"} and not parts[1].startswith("."),
                         f"Development file in package: {name}")
         text = package.read(f"{ADDON}/{ADDON}.toc").decode("utf-8-sig")

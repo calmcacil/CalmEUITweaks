@@ -105,6 +105,7 @@ local function New(options)
     EditMacro = function(index, name, icon, body)
         assert(not state.combat, "Edit attempted in combat")
         assert(index > 120 and index <= 138, "Edit must be character-only")
+        assert(name == nil and icon == nil, "Owned edits must preserve macro name and icon")
         state.writes = state.writes + 1
         state.macros[index].body = body
         return index
@@ -151,6 +152,9 @@ local function New(options)
 end
 
 local s, settings, ns, m = New()
+Check(s.provider.settingsKey == "mageMacro" and s.provider.class == "MAGE"
+    and s.provider.classLabel == "Mage" and s.provider.defaultName == "Mage FoodWater"
+    and type(s.provider.Build) == "function", "Mage registration matches provider contract")
 m:Initialize(); s:Flush()
 Check(s.writes == 1, "Initial character creation")
 Check(s.macros[121].body == table.concat({
@@ -312,5 +316,116 @@ Check(#s.reports == 1, "Synchronous repeated failure is deduplicated")
 s.buildError = nil; s:Event("SPELLS_CHANGED")
 Check(s.writes == 1 and not s.coreError and s.clears == 1 and not frame.scripts.OnUpdate,
     "Synchronous recovery clears error only after running")
+
+local tiers = {
+    { level = 1, foodSpell = 587, foodItem = 5349, waterSpell = 5504, waterItem = 5350 },
+    { level = 6, foodSpell = 597, foodItem = 1113, waterSpell = 5505, waterItem = 2288 },
+    { level = 12, foodSpell = 990, foodItem = 1114, waterSpell = 5506, waterItem = 2136 },
+    { level = 22, foodSpell = 6129, foodItem = 1487, waterSpell = 6127, waterItem = 3772 },
+    { level = 32, foodSpell = 10144, foodItem = 8075, waterSpell = 10138, waterItem = 8077 },
+    { level = 42, foodSpell = 10145, foodItem = 8076, waterSpell = 10139, waterItem = 8078 },
+    { level = 52, foodSpell = 28612, foodItem = 22895, waterSpell = 10140, waterItem = 8079 },
+}
+for rank, selected in ipairs(tiers) do
+    for _, level in ipairs({ selected.level - 1, selected.level }) do
+        s, settings, ns, m = New({ level = level })
+        for i, tier in ipairs(tiers) do
+            s.known[tier.foodSpell], s.known[tier.waterSpell] = true, true
+            s.names[tier.foodSpell], s.names[tier.waterSpell] = "Food " .. i, "Water " .. i
+        end
+        local body, message = s.provider.Build()
+        if level == 0 then
+            Check(body == nil and type(message) == "string", "No eligible ranks below minimum level")
+        else
+            local expectedRank = level == selected.level and rank or rank - 1
+            local expected = tiers[expectedRank]
+            Check(body == table.concat({
+                "#showtooltip",
+                "/use [btn:1] item:" .. expected.foodItem,
+                "/use [btn:1] item:" .. expected.waterItem,
+                "/castsequence [btn:2] reset=10 Food " .. expectedRank .. ", Water " .. expectedRank,
+            }, "\n"), "Exact mage body at level " .. level)
+        end
+        Check(s.writes == 0 and next(ns.charDB.mageMacro) == nil,
+            "Rank generation never writes macros or ownership")
+    end
+end
+
+s, settings, ns, m = New()
+s.known[28612], s.names[28612] = true, "Food VII"
+m:Initialize(); s:Flush()
+Check(s.macros[121].body:find("item:22895", 1, true)
+    and s.macros[121].body:find("item:5350", 1, true)
+    and s.macros[121].body:find("Food VII, Conjure Water", 1, true),
+    "Food and water choose known ranks independently")
+s, settings, ns, m = New()
+s.known[5504] = false; m:Initialize(); s:Flush()
+Check(s.writes == 0 and next(s.requests) == nil and m:GetStatus():find("Learn both", 1, true),
+    "Missing spell knowledge waits without requesting name data")
+s, settings, ns, m = New()
+s.names[587] = nil
+local body, message, missing = s.provider.Build()
+Check(body == nil and type(message) == "string" and #missing == 1 and missing[1] == 587
+    and next(s.requests) == nil, "Mage reports only selected missing data without requesting it")
+
+s, settings, ns, m = New()
+body = s.provider.Build()
+s.macros[121] = { name = settings.name, body = body }
+m:Initialize(); s:Flush()
+Check(s.writes == 0 and not ns.charDB.mageMacro.ownedMacros
+    and m:GetStatus():find("Name conflict", 1, true), "Identical unowned body is never adopted")
+s, settings, ns, m = New(); m:Initialize(); s:Flush()
+body = s.macros[121].body
+s.macros[1] = { name = settings.name, body = body }
+s.known[28612], s.names[28612] = true, "Food VII"
+s:Event("SPELLS_CHANGED"); s:Flush()
+Check(s.writes == 1 and s.macros[121].body == body
+    and m:GetStatus():find("Name conflict", 1, true), "Account duplicate blocks an owned character update")
+s.macros[1] = nil
+s.macros[122] = { name = settings.name, body = body }
+s:Event("UPDATE_MACROS"); s:Flush()
+Check(s.writes == 1 and m:GetStatus():find("Name conflict", 1, true),
+    "Character duplicate blocks an owned update")
+s.macros[121], s.macros[122] = nil, nil
+s:Event("UPDATE_MACROS"); s:Flush()
+Check(s.writes == 2 and s.macros[121].body:find("Food VII", 1, true)
+    and ns.charDB.mageMacro.ownedMacros[settings.name].lastGeneratedBody == s.macros[121].body,
+    "Deleting an owned macro allows verified recreation")
+
+s, settings, ns, m = New(); m:Initialize(); s:Flush()
+body = s.macros[121].body
+s.known[28612], s.names[28612] = true, "Food VII"
+EditMacro = function(index) s.macros[index].body = "partial native edit"; return index end
+s:Event("SPELLS_CHANGED"); s:Flush()
+Check(ns.charDB.mageMacro.ownedMacros[settings.name].lastGeneratedBody == body
+    and m:GetStatus():find("could not be verified", 1, true),
+    "Unverifiable edit retains prior ownership without rollback")
+s:Event("UPDATE_MACROS"); s:Flush()
+Check(s.macros[121].body == "partial native edit" and m:GetStatus():find("User-edited", 1, true),
+    "Partial write is preserved on the next refresh")
+s, settings, ns, m = New()
+local create = CreateMacro
+CreateMacro = function(...)
+    local index = create(...)
+    s.macros[index].body = "partial native create"
+    return index
+end
+m:Initialize(); s:Flush()
+Check(not ns.charDB.mageMacro.ownedMacros and s.macros[121].body == "partial native create"
+    and m:GetStatus():find("could not be verified", 1, true),
+    "Unverifiable creation never claims or deletes the macro")
+
+s, settings, ns, m = New(); s.names = {}; m:Initialize(); s:Flush()
+s:Event("SPELL_DATA_LOAD_RESULT", 587, false)
+s:Event("SPELL_DATA_LOAD_RESULT", 5504, false); s:Flush()
+settings.enabled = false; m:ApplySettings()
+settings.enabled = true; m:ApplySettings(); s:Flush()
+Check(s.requests[587] == 2 and s.requests[5504] == 2,
+    "A fresh activation permits one new spell-data request per ID")
+s:Event("SPELLS_CHANGED")
+local oldBuilds = s.builds
+settings.enabled = false; m:ApplySettings()
+settings.enabled = true; m:ApplySettings(); s:Flush()
+Check(s.builds == oldBuilds + 1, "Old queued activation cannot run after disable and reenable")
 
 print("PASS: " .. passed .. " macro regression checks")

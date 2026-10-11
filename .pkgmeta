@@ -14,3 +14,4 @@ ignore:
   - tests
   - scripts
   - docs
+  - specs
