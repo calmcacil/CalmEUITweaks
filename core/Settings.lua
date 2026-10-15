@@ -7,6 +7,7 @@ ns.defaults = {
     whatsTraining = { enabled = true },
     questLootSparkles = { enabled = false },
     gatheringSparkles = { enabled = false },
+    lfgLeaderLocation = { enabled = false },
     chat = { autoApply = false },
     spacers = { spacer1 = false, spacer2 = false, spacer3 = false, spacer4 = false },
     spacerLayouts = {},
