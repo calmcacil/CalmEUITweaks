@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.4.0...v0.5.0) (2026-10-15)
+
+
+### Features
+
+* **lfg:** add opt-in leader zone labels ([#24](https://github.com/calmcacil/CalmEUITweaks/issues/24)) ([b0288a5](https://github.com/calmcacil/CalmEUITweaks/commit/b0288a56b1677b1a2063451f2d483a62d427a916))
+
+
+### CI
+
+* consolidate Renovate updates and keep validated Ubuntu runners ([#22](https://github.com/calmcacil/CalmEUITweaks/issues/22)) ([1697db8](https://github.com/calmcacil/CalmEUITweaks/commit/1697db89e4462c259908ee20fee7236a5ea46a06))
+* **deps:** bump the actions group with 2 updates ([#10](https://github.com/calmcacil/CalmEUITweaks/issues/10)) ([0ee86b1](https://github.com/calmcacil/CalmEUITweaks/commit/0ee86b13eb3008b81c987efce36f7d9390c6c654))
+
 ## [0.4.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.3.0...v0.4.0) (2026-10-11)
 
 
