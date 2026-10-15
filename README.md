@@ -3,7 +3,8 @@
 A companion addon for [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/)
 on WoW Forever. It adds spacer anchors, automatic anchor gaps, shared chat
 setups, a mage food/water macro, bag item levels and potential upgrade markers,
-quest-object and gathering sparkles, and a compatibility fix for WhatsTraining.
+quest-object and gathering sparkles, LFG leader locations, and a compatibility
+fix for WhatsTraining.
 
 ## Requirements and installation
 
@@ -29,6 +30,7 @@ Use `/calmtweaks status` to check dependencies and errors.
 | WhatsTraining fix | Enabled | Themes the training tab to match EUI's spellbook, including backgrounds, fonts and controls. |
 | Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
 | Ore / herb sparkles | Off | Marks the nearest soft-targeted ore vein or herb with golden glints. |
+| LFG leader location | Off | Shows the leader's current zone beside each LFG activity. |
 | Chat sharing | Manual; automatic updates off | Shares normal tabs, docking order, message groups and channel subscriptions. |
 | Spacer anchors | All four off | Adds invisible, resizable elements to EUI Unlock Mode. |
 | Player/Target corners | EUI Default | Aligns facing corners when these frames are anchored to a spacer. |
@@ -48,6 +50,19 @@ refresh calls do no item queries. Equipped item-data notifications are subscribe
 only while a requested lookup is pending.
 Training theme passes skip the hidden spellbook and unchanged native font writes;
 showing the spellbook applies pending theme changes.
+
+## LFG leader location
+
+Enable **LFG leader location** on **General** to show each listing leader's
+current zone beside the activity in the Looking For Group browser. The label
+uses soft blue text with the row's current font and opacity, including EUI styling. No extra addon
+is required. Disable Where You At if installed to avoid duplicate labels.
+
+Use the zone to judge travel progress while forming a group. It describes only
+the leader, not every member, and does not confirm summoning-stone range.
+Location data updates when the native LFG result refreshes; unavailable zones
+and labels without enough room stay hidden. Disabling or resetting preferences
+hides the labels immediately. The setting is account-wide and defaults off.
 
 ## Quest loot sparkles
 

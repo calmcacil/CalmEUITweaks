@@ -974,6 +974,7 @@ local function checkVisiblePages(s)
         ["WhatsTraining spellbook theme"] = { "whatsTraining", "enabled" },
         ["Quest loot sparkles"] = { "questLootSparkles", "enabled" },
         ["Ore / herb sparkles"] = { "gatheringSparkles", "enabled" },
+        ["LFG leader location"] = { "lfgLeaderLocation", "enabled" },
         ["Maintain character macro"] = { "mageMacro", "enabled" },
         ["Enable bag / bank item levels"] = { "simpleItemLevel", "enabled" },
         ["Inventory bags"] = { "simpleItemLevel", "inventory" },

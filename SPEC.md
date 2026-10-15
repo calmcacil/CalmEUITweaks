@@ -108,6 +108,29 @@ clean up links.
   Combat-end is subscribed only while work is pending. Disabled idle features
   have no subscriptions; pending restoration retains readiness events.
 
+### LFG leader location
+
+- One account toggle on General defaults off. It adds the listing leader's
+  current `areaName` beside the native LFG activity, using
+  `C_LFGList.GetSearchResultLeaderInfo`. This is a zone hint for group formation,
+  not stone-distance detection or a report about every member.
+- Labels use soft blue text and inherit the current activity font, shadow,
+  opacity and line height.
+  They occupy only the gap before group data, without changing native content.
+  Missing/blank zones, hidden results, section dividers and insufficient space
+  produce no label. Pooled rows reuse labels and hide stale zones on refresh.
+- A secure post-hook on `LFGBrowseSearchEntry_Update` follows native result
+  updates. Enabling refreshes existing ScrollBox rows; disabling/reset hides
+  owned labels immediately. The once-installed hook does no work while disabled.
+  No polling or extra search requests run. Late loading of
+  `Blizzard_GroupFinder_VanillaStyle` retries through the shared lifecycle.
+- Decoration changes defer through combat; affected labels hide until visible
+  rows refresh after combat. The combat-end subscription exists only while work
+  is pending. Missing native APIs leave the feature waiting. Callback failures
+  use the shared module error boundary. No third-party code or assets are used.
+- Native row fields and update functions are outside EUI's plugin API; verify
+  their behavior when updating the Forever client or EUI skin.
+
 ### Spacers
 
 - Four independent account switches, off by default, register native Unlock Mode
@@ -306,6 +329,7 @@ lua CalmEUITweaks/tests/SpacerCorners.lua
 lua CalmEUITweaks/tests/BagItemLevel.lua
 lua CalmEUITweaks/tests/QuestLootSparkles.lua
 lua CalmEUITweaks/tests/GatheringSparkles.lua
+lua CalmEUITweaks/tests/LFGLeaderLocation.lua
 lua CalmEUITweaks/tests/WhatsTraining.lua
 lua CalmEUITweaks/tests/WhatsTrainingTheme.lua
 lua CalmEUITweaks/tests/Smoke.lua
@@ -313,6 +337,13 @@ lua CalmEUITweaks/tests/Smoke.lua
 
 Before a release, verify on the installed Forever/EUI build:
 
+- [ ] Search for LFG leader location before opening General. Enable it with the
+  LFG browser already open; inspect solo/group listings, scrolling/recycled rows,
+  long activity/zone names, missing locations, filters, EUI styling and UI scales.
+  Check late UI loading, native result updates, combat/end, disable, reset,
+  cached pages, reload and account-wide persistence. Confirm it defaults off
+  and describes leader zones without claiming stone range. Disable Where You At
+  during these checks. Record and inspect the affected UI paths in game.
 - [ ] Confirm quest sparkles default off and are searchable on General. Enable
   near a lootable quest object; check normal/raid outline changes, graphics
   presets, reload, character switch, combat deferral, disable/reset restoration

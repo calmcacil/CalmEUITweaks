@@ -25,6 +25,7 @@ functions\SpacerCorners.lua
 functions\BagItemLevel.lua
 functions\QuestLootSparkles.lua
 functions\GatheringSparkles.lua
+functions\LFGLeaderLocation.lua
 compatability\WhatsTraining.lua
 options\Chat.lua
 options\Pages.lua
