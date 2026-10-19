@@ -317,23 +317,17 @@ revalidate them when updating EUI.
 
 ## Verification
 
-Use Lua 5.1 and run from the parent directory containing `CalmEUITweaks/`:
+From the repository root, trust the project config, install the pinned tools,
+and run the full check suite:
 
 ```powershell
-lua CalmEUITweaks/tests/CoreOptions.lua
-lua CalmEUITweaks/tests/Macros.lua
-lua CalmEUITweaks/tests/Chat.lua
-lua CalmEUITweaks/tests/Spacers.lua
-lua CalmEUITweaks/tests/AnchorGap.lua
-lua CalmEUITweaks/tests/SpacerCorners.lua
-lua CalmEUITweaks/tests/BagItemLevel.lua
-lua CalmEUITweaks/tests/QuestLootSparkles.lua
-lua CalmEUITweaks/tests/GatheringSparkles.lua
-lua CalmEUITweaks/tests/LFGLeaderLocation.lua
-lua CalmEUITweaks/tests/WhatsTraining.lua
-lua CalmEUITweaks/tests/WhatsTrainingTheme.lua
-lua CalmEUITweaks/tests/Smoke.lua
+mise trust
+mise install
+mise run check
 ```
+
+Use `mise run test` to run only the Lua 5.1 regression suites. On Windows, run
+these tasks from Git Bash or WSL so the existing Bash test harness is available.
 
 Before a release, verify on the installed Forever/EUI build:
 

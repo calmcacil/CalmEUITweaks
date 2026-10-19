@@ -1,0 +1,51 @@
+[tools]
+python = "3.13"
+shellcheck = "0.11.0"
+actionlint = "1.7.12"
+
+[tool_alias]
+lua = "github:dyne/luabinaries"
+luac = "github:dyne/luabinaries"
+lua-dll = "github:dyne/luabinaries"
+
+[tools.lua]
+version = "54f813a"
+format = "raw"
+
+[tools.lua.platforms]
+windows-x64 = { asset_pattern = "lua51.exe", bin = "lua.exe" }
+linux-x64 = { asset_pattern = "lua51", bin = "lua" }
+
+[tools.luac]
+version = "54f813a"
+format = "raw"
+
+[tools.luac.platforms]
+windows-x64 = { asset_pattern = "luac51.exe", bin = "luac.exe" }
+linux-x64 = { asset_pattern = "luac51", bin = "luac" }
+
+[tools."lua-dll"]
+version = "54f813a"
+os = ["windows"]
+format = "raw"
+platforms.windows-x64 = { asset_pattern = "lua51.dll", bin = "lua51.dll" }
+
+[env]
+LUA_BIN = "lua"
+LUAC_BIN = "luac"
+PYTHON_BIN = "python"
+
+[settings]
+lockfile = true
+
+[tasks.check]
+description = "Run source, Lua, shell, and workflow checks"
+run = "bash scripts/check.sh"
+
+[tasks.test]
+description = "Run the Lua 5.1 regression tests"
+run = "bash scripts/test.sh"
+
+[tasks.package-check]
+description = "Validate the installable addon package"
+run = "bash scripts/check-package.sh"

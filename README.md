@@ -283,8 +283,10 @@ chat automation and spacers, and does not delete macros or rewrite EUI profiles.
 
 ## Development
 
-See [SPEC.md](SPEC.md) for the behavior contract, test commands and release
-checks. Mocked regression tests do not replace verification in WoW.
+Trust the project config with `mise trust`, then install its pinned tools with
+`mise install`. Run `mise run check` from Git Bash or WSL on Windows. See
+[SPEC.md](SPEC.md) for the behavior contract and release checks. Mocked regression
+tests do not replace verification in WoW.
 
 The consolidated testing release is **0.2.0**. A future **1.0.0**
 will mark the first stable release. Download the installable ZIP from
