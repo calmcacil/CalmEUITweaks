@@ -4,7 +4,7 @@ local addonName = "CalmEUITweaks"
 local root = "CalmEUITweaks/"
 local tests, passed, failed = {}, 0, 0
 local fileSets = {
-    ["Core.lua"] = { "core/Bootstrap.lua", "core/Settings.lua", "core/Lifecycle.lua", "core/AnchorEvents.lua", "core/Commands.lua" },
+    ["Core.lua"] = { "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/Lifecycle.lua", "core/AnchorEvents.lua", "core/Commands.lua" },
     ["Options.lua"] = { "options/Chat.lua", "options/Pages.lua", "options/EllesmereUI.lua" },
 }
 
@@ -215,6 +215,11 @@ local function sandbox(options)
 end
 
 local function core(options) return sandbox(options):load("Core.lua") end
+local function initializedDefaults(s)
+    local expected = copy(s.ns.defaults)
+    expected.schemaVersion = s.ns.SCHEMA_VERSION
+    return expected
+end
 
 local privateRegistries = { "ADDON_GROUPS", "ADDON_ROSTER", "_addonInfoByFolder", "_modules", "_syncExempt" }
 
@@ -303,7 +308,7 @@ test("own ADDON_LOADED creates independent saved settings and ownership storage"
     local s = core():initialize()
     equal(s.ns.db, s.env.CalmUITweaksDB)
     equal(s.ns.charDB, s.env.CalmUITweaksCharDB)
-    same(s.ns.db, s.ns.defaults)
+    same(s.ns.db, initializedDefaults(s))
     same(s.ns.charDB.mageMacro, {})
     equal(type(s.ns.charDB.chat), "table")
     truth(s.ns.db ~= s.ns.defaults)
@@ -313,15 +318,16 @@ test("own ADDON_LOADED creates independent saved settings and ownership storage"
 end)
 
 test("default filling preserves false, unknown fields, and ownership records", function()
-    local db = { version = "bad", mageMacro = { enabled = false, name = 42, extra = "keep" },
+    local db = { version = 1, mageMacro = { enabled = false, name = 42, extra = "keep" },
         simpleItemLevel = { enabled = false, inventory = false, reagent = false, bank = "bad" },
         whatsTraining = { enabled = false }, unrelated = { keep = 17 } }
     local ownership = { name = "Owned", body = "/use water", marker = true }
-    local charDB = { version = false, mageMacro = ownership, another = false }
+    local charDB = { version = 1, mageMacro = ownership, another = false }
     local s = core({ db = db, charDB = charDB }):initialize()
     equal(s.ns.db, db)
     equal(s.ns.charDB, charDB)
-    equal(db.version, 1)
+    equal(db.version, nil)
+    equal(db.schemaVersion, s.ns.SCHEMA_VERSION)
     equal(db.mageMacro.enabled, false)
     equal(db.mageMacro.name, "Mage FoodWater")
     equal(db.mageMacro.extra, "keep")
@@ -337,16 +343,17 @@ test("default filling preserves false, unknown fields, and ownership records", f
     s:storageUnchanged()
 end)
 
-test("malformed saved variable containers and nested settings are repaired", function()
+test("malformed roots are preserved while recognized nested settings are repaired", function()
     for _, value in ipairs({ false, 7, "invalid" }) do
         local s = core({ db = value, charDB = value }):initialize()
-        same(s.ns.db, s.ns.defaults)
-        same(s.ns.charDB.mageMacro, {})
-        equal(type(s.ns.charDB.chat), "table")
+        equal(s.ns.db, nil)
+        equal(s.env.CalmUITweaksDB, value)
+        equal(s.env.CalmUITweaksCharDB, value)
+        truth(s.ns.settingsError, "Malformed roots require an explicit recovery decision")
     end
     local s = core({ db = { mageMacro = false, simpleItemLevel = "bad", whatsTraining = 1 },
         charDB = { mageMacro = "bad" } }):initialize()
-    same(s.ns.db, s.ns.defaults)
+    same(s.ns.db, initializedDefaults(s))
     same(s.ns.charDB.mageMacro, {})
 end)
 
@@ -516,7 +523,7 @@ test("duplicate module registration rejects without replacing the first module",
     local ok = pcall(s.ns.RegisterModule, "mageMacro", {})
     equal(ok, false)
     equal(s.ns.modules.mageMacro, module)
-    same(s.ns.moduleOrder, { "mageMacro" })
+    same(s.ns.moduleOrder, { "migrations", "mageMacro" })
 end)
 
 test("setters reject calls before ADDON_LOADED without creating saved variables", function()
@@ -600,9 +607,11 @@ test("reset disables chat automation while preserving the default and character 
     local s = core({ db = { chat = { autoApply = true, default = preset } },
         charDB = { chat = receipt } }):initialize():login()
     local before = copy(receipt)
+    same(s.ns.db.chat.default, preset, "Migration preserves the saved chat content")
+    local savedDefault = s.ns.db.chat.default
     s.ns.ResetSettings()
     equal(s.ns.db.chat.autoApply, false)
-    equal(s.ns.db.chat.default, preset)
+    equal(s.ns.db.chat.default, savedDefault)
     same(s.ns.charDB.chat, before)
     s:storageUnchanged()
 end)
@@ -708,7 +717,7 @@ test("slash status, help, and macro-name handle whitespace and validation", func
     local slash = s.env.SlashCmdList.CALMUITWEAKS
     slash("  STATUS  ")
     contains(s.messages[1], "Options:")
-    contains(s.messages[2], "mageMacro: Available")
+    contains(s.messages[#s.messages], "mageMacro: Available")
     slash("  MACRO-NAME    New Water   ")
     equal(s.ns.db.mageMacro.name, "New Water")
     contains(s.messages[#s.messages], "previous macros are left intact")
@@ -961,17 +970,18 @@ test("slash status reports plugin registration and prioritizes options errors", 
         local s = optionsFixture()
         local expected = "registered via EUI plugin API"
         local slash = s.env.SlashCmdList.CALMUITWEAKS
-        slash("status")
-        contains(s.messages[#s.messages], expected)
+        local function OptionsStatus()
+            local before = #s.messages
+            slash("status")
+            return s.messages[before + 1]
+        end
+        contains(OptionsStatus(), expected)
         s.ns.optionsError = "adapter open failure"
-        slash("status")
-        contains(s.messages[#s.messages], "adapter open failure")
+        contains(OptionsStatus(), "adapter open failure")
         s.ns.optionsRenderError = "render failure"
-        slash("status")
-        contains(s.messages[#s.messages], "render failure")
+        contains(OptionsStatus(), "render failure")
         s.ns.ReportError("options", "cached status failure")
-        slash("status")
-        contains(s.messages[#s.messages], "cached status failure")
+        contains(OptionsStatus(), "cached status failure")
 end)
 
 local function checkVisiblePages(s)
@@ -1134,6 +1144,47 @@ test("missing or failing active-module APIs never refresh unrelated pages", func
     s.activeModule = "plugin:" .. addonName .. ":Tweaks"
     s.ns.RefreshOptions()
     equal(s.ns.errors.options, nil, "successful own-page refresh recovers")
+end)
+
+test("unsupported schema disables options and rejects slash reset without changing data", function()
+    local db = {schemaVersion = 99, mageMacro = {enabled = false}, keep = "future"}
+    local s = optionsFixture({db = db}):initialize():login()
+    local before = copy(db)
+    for _, page in ipairs(s.pluginRegistration.modules[1].pages) do s:build(page) end
+    for _, row in ipairs(s.rows) do
+        for _, cfg in ipairs({row.left, row.right}) do
+            if cfg.type ~= "label" then
+                equal(cfg.disabled(), true)
+                contains(cfg.disabledTooltip(), "schema version")
+            end
+        end
+    end
+    s.env.SlashCmdList.CALMUITWEAKS("reset confirm")
+    contains(s.messages[#s.messages], "schema version")
+    same(db, before)
+    equal(s.ns.db, nil)
+end)
+
+test("cached controls unlock after a pending schema resumes without rebuilding", function()
+    local s = optionsFixture({db = {schemaVersion = 2}})
+    local allow = false
+    s.ns.SCHEMA_VERSION = 3
+    s.ns.schemaMigrations[3] = {migrate = function() return allow, "Waiting for migration test." end}
+    s:initialize():login()
+    s:build("General")
+    local control, rows = s.rows[1].left, #s.rows
+    equal(control.disabled(), true)
+    contains(control.disabledTooltip(), "Waiting for migration test")
+    local refreshed
+    s.env.EllesmereUI.RefreshPage = function(_, force)
+        equal(force, nil)
+        refreshed = control.disabled()
+    end
+    allow = true
+    s.ns.ResumeStartup()
+    equal(control.disabled(), false)
+    equal(refreshed, false, "Resumed startup refreshes cached native states")
+    equal(#s.rows, rows)
 end)
 
 test("native visible pages retain noCapture settings and isolated widget writes", function()
@@ -1355,11 +1406,11 @@ test("missing compatibility addons grey out their controls without changing pref
                 local dependency = dependencies[cfg.text]
                 if dependency then
                     equal(cfg.disabled(), loaded[dependency] ~= true, cfg.text)
-                    contains(cfg.disabledTooltip, dependency, "disabled tooltip must identify the dependency")
+                    contains(cfg.disabledTooltip(), dependency, "disabled tooltip must identify the dependency")
                     equal(cfg.getValue(), true, "greying a control must preserve its saved choice")
                     checked = checked + 1
                 elseif cfg.type == "toggle" then
-                    equal(cfg.disabled, nil, "missing compatibility addons must not disable unrelated features")
+                    equal(cfg.disabled(), false, "missing compatibility addons must not disable unrelated features")
                 end
             end
         end

@@ -94,6 +94,9 @@ explicit user instruction, follow the user instruction.
 - Preserve account versus character settings, existing migrations, and macro
   ownership. Do not silently delete saved data or reset user preferences during
   a cleanup.
+- Saved-data changes follow `specs/saved-variables/PRODUCT.md` and `TECH.md`.
+  Append schema steps before changing defaults; never stamp the target version
+  without completing the required migrations.
 
 ## Repository layout and validation
 

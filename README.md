@@ -90,14 +90,18 @@ Ore/herb sparkles have been removed. On upgrade, the addon restores targeting
 settings recorded by the old feature only when they still match its last writes;
 subsequent changes by you or another addon are preserved. Cleanup waits through
 combat or unavailable APIs, keeps unfinished records across reloads, and removes
-the obsolete settings when complete. A completed upgrade prints one chat line such
-as `savedvarsdb updated from "0" to "1"`; fresh installs and already-current
-accounts stay silent. `/calmtweaks status` reports cleanup errors
-or pending work. The account-wide `cvarVersion` records completed cleanup steps
-and survives preference resets. Quest loot sparkles wait until pending CVar
-migrations finish, then use their unchanged settings; other features remain usable.
-Newer or invalid saved CVar versions block console changes rather than discarding
-unknown records.
+the obsolete settings when complete. The account-wide `schemaVersion` now tracks
+all saved-data migrations. Existing 0.6.x `cvarVersion = 1` data adopts that completed
+cleanup and upgrades to schema 2 without replaying it. After login, an existing
+account gets one notice such as `savedvarsdb updated from "1" to "2"`; fresh and
+already-current accounts stay silent.
+
+`/calmtweaks status` reports upgrade progress or errors. Features and options
+editing wait until the saved schema is ready, so nothing uses partially upgraded
+data. Unsupported account or character versions are preserved rather than reset.
+Do not manually raise the version to bypass cleanup. Back up SavedVariables before
+upgrading or downgrading; older releases that do not understand the new schema
+cannot enforce its downgrade protection.
 
 ## Spacer anchors
 
@@ -282,17 +286,20 @@ Character-specific macro ownership, chat apply records and corner baselines use
 `CalmUITweaksCharDB`. These are normal WoW SavedVariables, separate from EUI
 profiles. Existing character spacer geometry seeds missing account layouts on
 first load; later characters cannot replace established account layouts.
-Reset preserves the saved chat default, spacer geometry and character records, disables
-chat automation and spacers, and does not delete macros or rewrite EUI profiles.
+Reset preserves the schema checkpoint, saved chat default, spacer geometry and
+character records, disables chat automation and spacers, and does not delete
+macros or rewrite EUI profiles. Reset and setting changes are rejected while an
+upgrade is pending or blocked; the status reason explains why.
 
 ## Development
 
 Trust the project config with `mise trust`, then install its pinned tools with
 `mise install`. Run `mise run check` from Git Bash or WSL on Windows. See
 [SPEC.md](SPEC.md) for the behavior contract and release checks. Mocked regression
-tests do not replace verification in WoW. Before changing owned CVar definitions,
-follow the [migration contract](specs/cvar-migrations/PRODUCT.md) and
-[step-authoring guide](specs/cvar-migrations/TECH.md).
+tests do not replace verification in WoW. Before changing saved data, follow the
+[SavedVariables contract](specs/saved-variables/PRODUCT.md) and
+[schema step-authoring guide](specs/saved-variables/TECH.md). Native console changes
+also follow the [CVar cleanup guide](specs/cvar-migrations/TECH.md).
 
 The consolidated testing release is **0.2.0**. A future **1.0.0**
 will mark the first stable release. Download the installable ZIP from

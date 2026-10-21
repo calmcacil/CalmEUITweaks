@@ -50,7 +50,7 @@ local function New(settings, anchors, lazy)
     local reapply = eui.ReapplyUnlockAnchor
     if lazy then eui.ReapplyUnlockAnchor = nil end
     env.EllesmereUI = eui
-    for _, file in ipairs({"core/Bootstrap.lua", "core/Settings.lua", "core/AnchorEvents.lua", "functions/AnchorGap.lua"}) do
+    for _, file in ipairs({"core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/AnchorEvents.lua", "functions/AnchorGap.lua"}) do
         local chunk = assert(loadfile("CalmEUITweaks/" .. file))
         if setfenv then setfenv(chunk, env) else chunk = assert(loadfile("CalmEUITweaks/" .. file, "t", env)) end
         chunk("CalmEUITweaks", ns)

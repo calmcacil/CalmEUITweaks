@@ -16,7 +16,7 @@ local restoreInitialized = false
 
 function module:ApplySettings()
     events:UnregisterAllEvents()
-    local ready, reason = ns.CVarMigrationsReady()
+    local ready, reason = ns.SavedVariablesReady()
     if not ready then ns.SetStatus("questLootSparkles", reason); return end
     local settings = ns.GetSettings("questLootSparkles")
     if not restoreInitialized then
