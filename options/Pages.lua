@@ -115,7 +115,21 @@ local function BuildPage(page, parent, y)
         y = y - height
     end
     local function Row(left, right)
-        local _, height = widgets:DualRow(parent, y, left, right or eui.BlankRowCfg())
+        right = right or eui.BlankRowCfg()
+        for _, cfg in ipairs({left, right}) do
+            if cfg.type ~= "label" then
+                local disabled, tooltip = cfg.disabled, cfg.disabledTooltip
+                cfg.disabled = function()
+                    return not ns.SavedVariablesReady() or (disabled and disabled()) or false
+                end
+                cfg.disabledTooltip = function()
+                    local ready, reason = ns.SavedVariablesReady()
+                    if not ready then return reason end
+                    return type(tooltip) == "function" and tooltip() or tooltip
+                end
+            end
+        end
+        local _, height = widgets:DualRow(parent, y, left, right)
         y = y - height
     end
     local function Text(text, getText, minimumHeight)

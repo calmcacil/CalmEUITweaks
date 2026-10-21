@@ -13,7 +13,7 @@
 core\Bootstrap.lua
 core\Settings.lua
 core\CVars.lua
-core\LegacyCVars.lua
+core\Migrations.lua
 core\Lifecycle.lua
 core\AnchorEvents.lua
 core\Commands.lua

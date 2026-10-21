@@ -35,10 +35,12 @@ reports again.
 | `CalmUITweaksCharDB` | Macro ownership, chat apply records and corner baselines tied to native EUI anchors. |
 | EUI layout | Native anchor and size-match links, including offsets and growth pins. |
 
-SavedVariables initialize on this addon's `ADDON_LOADED`. Modules initialize
-once and apply after login, or immediately when loaded after login. Deferred
-requests are coalesced. Protected mutations wait through combat. Missing APIs
-and late-loaded dependencies can recover on subsequent lifecycle events.
+Raw SavedVariables are validated and migrated on this addon's `ADDON_LOADED`,
+before defaults or feature initialization. Data-only and empty cleanup steps can
+complete there; native cleanup waits for login/out-of-combat readiness. Pending
+upgrades delay all feature initialization. Once ready, modules initialize once
+and apply after login, or immediately when loaded after login. Deferred requests
+use the existing coalescer. Missing APIs can recover on readiness events.
 
 Runtime Lua must not register `OnUpdate` handlers, repeating tickers or timer
 polling chains. Deferred work uses coalesced, bounded event-triggered callbacks.
@@ -61,19 +63,28 @@ character records. It disables spacers and automatic chat updates, preserves
 macros and existing non-spacer anchor offsets, and lets native spacer removal
 clean up links.
 
-### Versioned CVar cleanup
+### Versioned SavedVariables
 
-The [CVar migration contract](specs/cvar-migrations/PRODUCT.md) and
-[implementation/authoring guide](specs/cvar-migrations/TECH.md) define upgrades.
-`CalmUITweaksDB.cvarVersion` is the last completed step, independent of release
-and general settings versions. Missing means 0; migration 1 retires gathering
-settings. Steps run in order after login and checkpoint only after completion.
-Upgrading saved data prints one chat notice naming the starting and completed
-versions; fresh installs and already-current accounts stay silent. Reset preserves
-the checkpoint and pending ledgers. Invalid or future versions
-preserve saved data and block CVar writes without readiness polling. Quest CVar
-validation and application wait until all migration steps complete; unrelated
-features continue normally.
+The [SavedVariables contract](specs/saved-variables/PRODUCT.md) and
+[implementation/authoring guide](specs/saved-variables/TECH.md) define upgrades.
+`CalmUITweaksDB.schemaVersion` is the last completed account migration; the code
+currently requires version 2. Missing canonical metadata adopts only recognized
+legacy `cvarVersion` 0/1, otherwise starts at 0. Step 1 retains gathering cleanup;
+step 2 removes recognized obsolete account markers and migrates shared anchor gaps.
+Steps checkpoint in order only after success. Pure-data failures discard tentative
+changes; native cleanup retains unresolved ownership for retry.
+
+The checkpoint is outside preference defaults and survives reset. Unknown,
+malformed or conflicting metadata in either store is preserved and blocks startup.
+Character `version` 1 or absence is supported; no new character schema counter is
+introduced. While pending or blocked, feature initialization, setters and reset
+are unavailable, with native disabled-state feedback and status reasons.
+
+Existing saved data announces completed upgrades once after login, for example
+`savedvarsdb updated from "1" to "2"`; fresh/current accounts stay silent. On
+successful readiness, startup resumes once and releases migration subscriptions.
+The [CVar cleanup guide](specs/cvar-migrations/TECH.md) specializes this same runner;
+it is not a separate versioning system.
 
 ### Retired targeting settings
 
@@ -85,8 +96,9 @@ old enabled preference immediately
 and deletes the saved ledger after restoring still-owned values or observing
 later external writes. It never sets targeting defaults or touches quest graphics.
 
-Cleanup starts after login, defers through combat and unavailable console APIs,
-and retains failed restores across reset, reload and character changes. Only
+Native cleanup starts after login and defers through combat or unavailable console
+APIs. Failed restores survive reload and character changes; reset is rejected
+while the schema is pending, preserving the unfinished ledger. Only
 pending cleanup subscribes to world/variable readiness and relevant CVar changes;
 combat-end is subscribed only while waiting. Own writes schedule no work. Fresh
 installs and completed cleanup have no cleanup frame subscriptions or polling.

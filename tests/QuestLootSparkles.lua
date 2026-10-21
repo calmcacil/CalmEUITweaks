@@ -49,7 +49,7 @@ local function New(saved, current)
         end,
     }
     env.C_Timer = { After = function(_, callback) timers[#timers + 1] = callback end }
-    for _, file in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/LegacyCVars.lua", "core/Lifecycle.lua",
+    for _, file in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/Lifecycle.lua",
         "functions/QuestLootSparkles.lua" }) do
         local chunk = assert(loadfile("CalmEUITweaks/" .. file))
         setfenv(chunk, env)

@@ -86,7 +86,7 @@ local function Sandbox(enabled, late)
     function s:enable(value) self.ns.SetSetting("lfgLeaderLocation", "enabled", value) end
     function s:watchingCombat() return self.frames[2].events.PLAYER_REGEN_ENABLED end
     if not late then s:installUI() end
-    for _, path in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/Lifecycle.lua", "functions/LFGLeaderLocation.lua" }) do
+    for _, path in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/Lifecycle.lua", "functions/LFGLeaderLocation.lua" }) do
         local chunk = assert(loadfile(root .. path))
         setfenv(chunk, env)
         chunk("CalmEUITweaks", s.ns)

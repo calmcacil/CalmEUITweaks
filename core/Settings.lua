@@ -1,7 +1,6 @@
 local _, ns = ...
 
 ns.defaults = {
-    version = 1,
     mageMacro = { enabled = true, name = "Mage FoodWater" },
     simpleItemLevel = { enabled = true, inventory = true, reagent = true, bank = true },
     whatsTraining = { enabled = true },
@@ -33,13 +32,6 @@ local function FillDefaults(db, defaults)
     end
 end
 
-local function ValidateVersion(db)
-    local version = db.version
-    if type(version) ~= "number" or version < 1 or version == math.huge or version ~= math.floor(version) then
-        db.version = ns.defaults.version
-    end
-end
-
 local function IsValidMacroName(name)
     return name:find("%S") ~= nil and #name <= (MAX_MACRO_NAME_LENGTH or 16) and not name:find("[%c|]")
 end
@@ -51,28 +43,15 @@ local function ValidGap(value)
 end
 
 function ns.InitializeSettings()
-    if type(CalmUITweaksDB) ~= "table" then CalmUITweaksDB = {} end
-    local gaps = CalmUITweaksDB.anchorGap
-    if type(gaps) == "table" then
-        -- Migrate the shared default without overwriting any existing side preferences.
-        if ValidGap(gaps.pixels) then
-            for _, side in ipairs(gapSides) do
-                if gaps[side] == nil then gaps[side] = gaps.pixels end
-            end
-        end
-        gaps.pixels = nil
-    end
+    if not ns.RunSchemaMigrations() then return false end
     FillDefaults(CalmUITweaksDB, ns.defaults)
-    ValidateVersion(CalmUITweaksDB)
     ns.db = CalmUITweaksDB
     for _, side in ipairs(gapSides) do
         if not ValidGap(ns.db.anchorGap[side]) then
             ns.db.anchorGap[side] = ns.defaults.anchorGap[side]
         end
     end
-    if type(CalmUITweaksCharDB) ~= "table" then CalmUITweaksCharDB = {} end
     FillDefaults(CalmUITweaksCharDB, { version = 1, mageMacro = {}, chat = {}, spacerCorners = {} })
-    ValidateVersion(CalmUITweaksCharDB)
     ns.charDB = CalmUITweaksCharDB
     -- The first loaded character seeds missing account layouts; later characters cannot overwrite them.
     local legacy = ns.charDB.spacers
@@ -94,6 +73,13 @@ function ns.InitializeSettings()
     if not IsValidMacroName(ns.db.mageMacro.name) then
         ns.db.mageMacro.name = ns.defaults.mageMacro.name
     end
+    ns.settingsReady = true
+    return true
+end
+
+function ns.SavedVariablesReady()
+    if ns.settingsReady then return true end
+    return false, ns.settingsError or ns.errors.migrations or ns.statuses.migrations or "Settings are not loaded yet."
 end
 
 function ns.GetSettings(key)
@@ -101,7 +87,8 @@ function ns.GetSettings(key)
 end
 
 function ns.SetSetting(moduleKey, key, value)
-    if not ns.db then return false, "Settings are not loaded yet." end
+    local ready, reason = ns.SavedVariablesReady()
+    if not ready then return false, reason end
     local defaults = ns.defaults[moduleKey]
     if type(defaults) ~= "table" or defaults[key] == nil or type(value) ~= type(defaults[key]) then
         return false, "Unknown setting or invalid value."
@@ -126,7 +113,8 @@ function ns.SetSetting(moduleKey, key, value)
 end
 
 function ns.ResetSettings()
-    if not ns.db then return end
+    local ready, reason = ns.SavedVariablesReady()
+    if not ready then return false, reason end
     -- Preference resets preserve macro ownership and the saved chat setup.
     local chatDefault = ns.db.chat.default
     local spacerLayouts = ns.db.spacerLayouts
@@ -139,4 +127,5 @@ function ns.ResetSettings()
         for _, key in ipairs(ns.moduleOrder) do ns.CallModule(key, "ApplySettings") end
     end
     if ns.RefreshOptions then ns.RefreshOptions() end
+    return true
 end

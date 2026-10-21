@@ -59,6 +59,10 @@ end
 
 function ns.GetStatus(key)
     if ns.errors[key] then return ns.errors[key] end
+    if ns.settingsError then return ns.settingsError end
+    if ns.settingsPending and key ~= "migrations" then
+        return ns.errors.migrations or ns.statuses.migrations or "Waiting for saved-data migration."
+    end
     local module = ns.modules[key]
     if module and type(module.GetStatus) == "function" then
         local ok, status = pcall(module.GetStatus, module)

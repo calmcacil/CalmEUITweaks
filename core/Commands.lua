@@ -13,8 +13,8 @@ SlashCmdList.CALMUITWEAKS = function(message)
         ns.Print(ok and "Macro name changed; previous macros are left intact." or err)
     elseif command == "reset" then
         if argument == "confirm" then
-            ns.ResetSettings()
-            ns.Print("Personal preferences reset. Macro ownership and existing macros are preserved. The saved chat default is retained.")
+            local ok, reason = ns.ResetSettings()
+            ns.Print(ok and "Personal preferences reset. Macro ownership and existing macros are preserved. The saved chat default is retained." or reason)
         else
             ns.Print("Type /calmtweaks reset confirm to reset only this addon's preferences.")
         end

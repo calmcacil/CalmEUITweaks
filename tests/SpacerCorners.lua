@@ -61,7 +61,7 @@ local function New(saved, character, anchors)
     eui.ReapplyOwnAnchor = function(unit) assert(not combat); applies[#applies + 1] = unit end
     eui.PropagateAnchorChain = function() end
     env.EllesmereUI = eui
-    for _, file in ipairs({"core/Bootstrap.lua", "core/Settings.lua", "core/AnchorEvents.lua", "functions/SpacerCorners.lua"}) do
+    for _, file in ipairs({"core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/AnchorEvents.lua", "functions/SpacerCorners.lua"}) do
         local chunk = assert(loadfile("CalmEUITweaks/" .. file))
         if setfenv then setfenv(chunk, env) else chunk = assert(loadfile("CalmEUITweaks/" .. file, "t", env)) end
         chunk("CalmEUITweaks", ns)
