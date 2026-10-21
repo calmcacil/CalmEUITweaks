@@ -415,6 +415,84 @@ local function PendingAndRecycling()
     check(button.ItemLevelText:IsShown() and next(h.event.events) == nil, "Combat disable restores native and releases listeners")
 end
 
+local function HiddenEquippedFailure()
+    local h = Harness()
+    local root = h:Root("EUI_MainBagFrame")
+    local button = h:Button(root, 0, 1, 410)
+    Equipped(h, 1, 411, 590, "INVTYPE_HEAD")
+    h.items[411].missing = true
+    h:Start()
+    check(h.requests[411] == 1, "Equipped lookup starts once")
+    root:Hide()
+    check(not h.event.events.ITEM_DATA_LOAD_RESULT and not h.event.events.GET_ITEM_INFO_RECEIVED,
+        "Hidden bags release item-data listeners")
+    h.event:Fire("ITEM_DATA_LOAD_RESULT", 411, false)
+    root:Show(); h:Draw()
+    check(h.requests[411] == 2, "Reopening retries equipped requests whose completion could be missed")
+    h:Draw("BAG_UPDATE_DELAYED")
+    check(h.requests[411] == 2, "Visible pending requests remain deduplicated")
+    h.items[411].missing = false
+    h.event:Fire("ITEM_DATA_LOAD_RESULT", 411, true); h:Draw()
+    check(h:Overlay(button).textureRegion:IsShown(), "Retried equipped data restores upgrade comparison")
+    local queries = h.levelQueries
+    h.event:Fire("ITEM_DATA_LOAD_RESULT", 411, true); h:Draw()
+    check(h.levelQueries == queries and #h.timers == 0, "Duplicate completion cannot restart resolved comparisons")
+    root:Hide()
+    Equipped(h, 1, 412, 650, "INVTYPE_HEAD")
+    h.items[412].missing = true
+    root:Show(); h:Draw()
+    queries = h.levelQueries
+    h.event:Fire("ITEM_DATA_LOAD_RESULT", 411, true); h:Draw()
+    check(h.levelQueries == queries and not h:Overlay(button).textureRegion:IsShown(),
+        "Late completion for old equipment cannot repaint a newer comparison")
+    h.items[412].missing = false
+    h.event:Fire("ITEM_DATA_LOAD_RESULT", 412, true); h:Draw()
+    check(not h:Overlay(button).textureRegion:IsShown(), "Current equipped result remains authoritative")
+
+    local visible = Harness()
+    local bags = visible:Root("EUI_MainBagFrame")
+    local bank = visible:Root("EUI_BankFrame")
+    visible:Button(bags, 0, 1, 413)
+    visible:Button(bank, -1, 1, 414)
+    Equipped(visible, 1, 415, 590, "INVTYPE_HEAD")
+    visible.items[415].missing = true
+    visible:Start()
+    bags:Hide(); bags:Show(); visible:Draw()
+    check(visible.requests[415] == 1 and visible.event.events.ITEM_DATA_LOAD_RESULT,
+        "Another visible scope keeps its pending request and completion listener")
+end
+
+local function PlayerLevelChanges()
+    local h = Harness()
+    h.settings.reagent, h.settings.bank = false, false
+    local root = h:Root("EUI_MainBagFrame")
+    local button = h:Button(root, 0, 1, 420)
+    h.items[420].minimum = 81
+    h:Start()
+    local arrow = h:Overlay(button).textureRegion
+    check(arrow.calls.SetVertexColor[2] == 0, "Unavailable upgrade starts red")
+    h.env.UnitLevel = function() return 81 end
+    h:Draw("PLAYER_LEVEL_UP")
+    check(arrow.calls.SetVertexColor[2] == 1, "Reaching the required level recolors cached upgrades")
+    local queries = h.levelQueries
+    h:Draw("BAG_UPDATE_DELAYED")
+    check(h.levelQueries == queries, "Level-up refresh preserves subsequent cached deduplication")
+    h.items[420].minimum = 82
+    h:Apply()
+    h.combat = true
+    h.env.UnitLevel = function() return 82 end
+    h:Draw("PLAYER_LEVEL_UP")
+    check(h.combatViolations == 0 and not arrow:IsShown(), "Combat level-up defers protected work and hides stale color")
+    h.combat = false; h:Draw("PLAYER_REGEN_ENABLED")
+    check(arrow:IsShown() and arrow.calls.SetVertexColor[2] == 1, "Combat-end renders the usable upgrade")
+    root:Hide(); h:Draw()
+    check(not h.event.events.PLAYER_LEVEL_UP, "Hidden scopes release the level-up listener")
+    root:Show(); h:Draw()
+    check(h.event.events.PLAYER_LEVEL_UP, "Visible scope restores the level-up listener")
+    h.settings.enabled = false; h:Apply()
+    check(next(h.event.events) == nil, "Disabled feature releases all subscriptions")
+end
+
 local function WeaponsAndScopes()
     local h = Harness()
     local root = h:Root("EUI_MainBagFrame")
@@ -520,5 +598,5 @@ local function CombatSuppression()
     end
 end
 
-for _, suite in ipairs({NativeComparison, LowQualitySuggestions, RefreshBudget, PendingAndRecycling, WeaponsAndScopes, CombatSuppression}) do suite() end
+for _, suite in ipairs({NativeComparison, LowQualitySuggestions, RefreshBudget, PendingAndRecycling, HiddenEquippedFailure, PlayerLevelChanges, WeaponsAndScopes, CombatSuppression}) do suite() end
 print("PASS: Bag item levels (" .. assertions .. " assertions)")

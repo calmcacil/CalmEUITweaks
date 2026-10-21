@@ -2,6 +2,7 @@ local addonName, ns = ...
 local module = {}
 local frames, elements, registered = {}, {}, {}
 local pending = false
+local editing = false
 local events, listenerHost
 local eventMask = {}
 local function RegisterEvent(event)
@@ -15,6 +16,7 @@ local function UnregisterListener()
         listenerHost:UnregisterUnlockModeListener(addonName .. "_Spacers")
     end
     listenerHost = nil
+    editing = false
 end
 local points = { CENTER = true, LEFT = true, RIGHT = true, TOP = true, BOTTOM = true,
     TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true }
@@ -118,7 +120,9 @@ function module:ApplySettings()
         and listenerHost ~= eui then
         listenerHost = eui
         eui:RegisterUnlockModeListener(addonName .. "_Spacers", function(active)
-            if not active and pending then ns.RequestApply("spacers") end
+            -- The visible editor closes during combat; this listener tracks the session.
+            editing = active == true
+            if not editing and pending then ns.RequestApply("spacers") end
         end)
     end
     if InCombatLockdown() then pending = true; RegisterEvent("PLAYER_REGEN_ENABLED"); return end
@@ -128,7 +132,7 @@ function module:ApplySettings()
         ns.SetStatus("spacers", "Waiting for EUI Unlock Mode API.")
         return
     end
-    if type(eui.IsUnlockModeActive) == "function" and eui:IsUnlockModeActive() then
+    if editing or (type(eui.IsUnlockModeActive) == "function" and eui:IsUnlockModeActive()) then
         pending = true
         ns.SetStatus("spacers", "Changes pending until Unlock Mode closes.")
         return

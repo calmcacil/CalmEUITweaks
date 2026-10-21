@@ -1,4 +1,4 @@
-local _, ns = ...
+local addonName, ns = ...
 local statusLabels = setmetatable({}, { __mode = "k" })
 local refreshing = false
 local failures = setmetatable({}, { __mode = "k" })
@@ -31,14 +31,24 @@ local function UpdateText(label, text, getText)
     else Recovered(label) end
 end
 
+local function RefreshActivePage(eui)
+    if type(eui.GetPluginModuleKey) ~= "function" or type(eui.GetActiveModule) ~= "function" then return end
+    local key = eui.GetPluginModuleKey(addonName, "Tweaks")
+    if key and eui:GetActiveModule() == key then
+        eui:RefreshPage()
+        return true
+    end
+end
+
 function ns.RefreshOptions()
     if refreshing then return end
     refreshing = true
     for label, getText in pairs(statusLabels) do UpdateText(label, nil, getText) end
     local eui = _G.EllesmereUI
     if eui and type(eui.RefreshPage) == "function" then
-        local ok, err = pcall(eui.RefreshPage, eui)
-        if ok then Recovered(eui) else Failed(eui, err) end
+        local ok, refreshed = pcall(RefreshActivePage, eui)
+        if not ok then Failed(eui, refreshed)
+        elseif refreshed then Recovered(eui) end
     end
     refreshing = false
 end
@@ -118,18 +128,14 @@ local function BuildPage(page, parent, y)
 
     if page == "General" then
         Section("PERSONAL TWEAKS")
-        Row(Toggle("mageMacro", "enabled", "Mage food / water macro",
-            "Maintains a character macro for known food and water ranks. Configure it on the Mage Macro tab."),
-            CompatibilityToggle("simpleItemLevel", "Bag item levels",
-                "Shows item levels and potential upgrades in EUI bags and bank. Configure scopes on the Compatibility tab."))
-        Row(CompatibilityToggle("whatsTraining", "WhatsTraining spellbook theme",
-            "Themes the WhatsTraining tab to match the active EUI spellbook skin, including fonts, controls and backgrounds. Disabling restores owned changes."),
-            Toggle("questLootSparkles", "enabled", "Quest loot sparkles",
-                "Enables native quest-object sparkles by disabling normal and raid outlines. Off by default. Disabling restores owned graphics settings; restart the game to remove lingering sparkles."))
-        Row(Toggle("gatheringSparkles", "enabled", "Ore / herb sparkles",
-            "Adds golden sparkles to the nearest soft-targeted ore vein or herb. Enables interaction targeting and icons. Fixed appearance with no range or skill feedback. Off by default."),
+        Row(Toggle("questLootSparkles", "enabled", "Quest loot sparkles",
+            "Enables native quest-object sparkles by disabling normal and raid outlines. Off by default. Disabling restores owned graphics settings; restart the game to remove lingering sparkles."),
             Toggle("lfgLeaderLocation", "enabled", "LFG leader location",
                 "Shows each leader's current zone beside the activity in Looking For Group. Helps judge travel progress; does not measure distance to a summoning stone. Off by default."))
+        Text(nil, function()
+            return "Quest loot sparkles: " .. ns.GetStatus("questLootSparkles")
+                .. "\nLFG leader location: " .. ns.GetStatus("lfgLeaderLocation")
+        end, 60)
     elseif page == "Mage Macro" then
         Section("MAGE FOOD AND WATER")
         Row(Toggle("mageMacro", "enabled", "Maintain character macro",

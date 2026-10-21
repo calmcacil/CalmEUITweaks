@@ -40,10 +40,10 @@ because GitHub-only publication does not need markup conversion for WoWInterface
 
 ## Version policy
 
-Renovate groups action updates, including major and digest updates, into one
-PR with full SHA pins. Ubuntu runner upgrades are manual: workflows stay on
-24.04 until a newer image and the pinned actionlint support are verified
-together. Ubuntu 26.04 jobs currently run, but actionlint 1.7.12 rejects their
+Dependabot checks GitHub Actions weekly on Monday at 05:30 Europe/Oslo and groups
+action updates into one PR. Actions retain full SHA pins. Ubuntu runner upgrades
+are manual: workflows stay on 24.04 until a newer image and the pinned actionlint
+support are verified together. Ubuntu 26.04 jobs currently run, but actionlint 1.7.12 rejects their
 runner label. Do not suppress workflow lint to accept an automatic OS upgrade.
 
 The consolidated testing release is 0.2.0. While testing, fixes increment the

@@ -165,7 +165,7 @@ local function Reserved(id)
 end
 local function CompatibleGroups(layout)
     if type(ChatTypeGroup) ~= "table" or not next(ChatTypeGroup) then
-        return false, "Chat message groups are not ready."
+        return false, "Chat message groups are not ready.", true
     end
     for _, w in ipairs(layout.windows) do
         local groups = {}
@@ -179,23 +179,27 @@ local function CompatibleGroups(layout)
     end
     return true
 end
+-- A third return value permits event-driven retries for missing data or frame instances, not unsupported APIs.
 local function Preflight(layout)
     local limit = WindowLimit()
-    if not Number(limit, 2, MAX_WINDOWS, true) or not GENERAL_CHAT_DOCK
+    if not Number(limit, 2, MAX_WINDOWS, true)
         or (type(FCF_IsChatWindowIndexReserved) ~= "function" and type(IsBuiltinChatWindow) ~= "function") then
         return false, "Modern chat frames are not ready."
     end
     for _, list in ipairs(layout and { required, restore } or { required }) do
         for _, name in ipairs(list) do if type(_G[name]) ~= "function" then return false, "Chat API unavailable: " .. name .. "." end end
     end
+    if not GENERAL_CHAT_DOCK then return false, "Modern chat frames are not ready.", true end
     local available = 0
     for id = 1, limit do
         local f = GetFrame(id)
-        if not f or f.isTemporary or type(f.GetID) ~= "function" then return false, "Permanent chat frames are not ready." end
+        if not f then return false, "Permanent chat frames are not ready.", true end
+        if f.isTemporary or type(f.GetID) ~= "function" then return false, "Permanent chat frames are not ready." end
         if not Reserved(id) then available = available + 1 end
         if layout and (id <= 2 or not Reserved(id)) then
             local tab = _G["ChatFrame" .. id .. "Tab"]
-            if not tab or type(tab.Show) ~= "function" or type(tab.Hide) ~= "function"
+            if not tab then return false, "Chat tabs are not ready.", true end
+            if type(tab.Show) ~= "function" or type(tab.Hide) ~= "function"
                 or type(f.Show) ~= "function" or type(f.Hide) ~= "function" then return false, "Chat tabs are not ready." end
             for _, method in ipairs(subscriptions) do
                 if type(_G["ChatFrame_" .. method]) ~= "function" and type(f[method]) ~= "function" then
@@ -273,8 +277,12 @@ local function Channels(work)
     return true, "Chat default applied."
 end
 local function Restore(work)
-    local ok, reason = Preflight(work.layout)
-    if not ok then Status(reason); return false, reason end
+    local ok, reason, waiting = Preflight(work.layout)
+    if not ok then
+        if not waiting and not work.automatic then pending = nil end
+        Status(reason)
+        return false, reason
+    end
     -- Preset IDs identify tabs, not native slots: modern clients reserve slot 3 for voice.
     local frames, used, active, live = { GetFrame(1), GetFrame(2) }, {}, {}, {}
     for id = 1, WindowLimit() do
@@ -379,8 +387,9 @@ local function Apply(automatic)
         if automatic then loginDefault = nil end
         return false, "Invalid saved chat date."
     end
-    local ok, message = Preflight(layout)
-    if not ok then Status(message); return false, message end
+    local ok, message, waiting = Preflight(layout)
+    if not ok and (automatic or not waiting) then Status(message); return false, message end
+    -- Keep the chosen default, not a later account replacement, through readiness waits.
     if pending and pending.export == default.export and pending.savedAt == default.savedAt then
         if not automatic then pending.automatic = false end
     else pending = { layout = layout, export = default.export, savedAt = default.savedAt, automatic = automatic } end
@@ -445,7 +454,7 @@ function Chat.GetSummary()
         return "Default saved: Not saved\nApplied to this character: Never\nNot applied"
     end
     local state = not character.appliedExport and "Not applied" or Chat.NeedsApply() and "Updated default available" or "Up to date"
-    if pending then state = pending.restored and "Waiting for channels" or "Waiting for combat" end
+    if pending then state = pending.restored and "Waiting for channels" or status or "Waiting for chat" end
     return "Default saved: " .. Date(account.default.savedAt) .. "\nApplied to this character: "
         .. (character.appliedAt and Date(character.appliedAt) or "Never") .. "\n" .. state
 end

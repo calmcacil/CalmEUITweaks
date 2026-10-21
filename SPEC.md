@@ -17,8 +17,12 @@ features retain their own dependency checks. Pages use native two-slot rows,
 filled left to right. Only the final row of a section may have an empty slot,
 using a fresh `EllesmereUI.BlankRowCfg()` for that slot. Hidden search builds use
 `EllesmereUI.IsSearchPrebuild()` to avoid custom label creation. Settings changes
-and page restoration refresh cached labels and native widget states in place,
-without rebuilding pages. Native refresh errors use the shared options boundary.
+and page restoration refresh cached labels in place. Native widget refreshes run
+only when this plugin's module is active, without rebuilding pages or refreshing
+another module. Module lookup and native refresh errors use the shared options
+boundary. General contains only the quest sparkle and LFG controls in one full
+row, with cached live status for both. Macro and compatibility controls
+appear only on their dedicated pages.
 Module and page errors are isolated and clear when the failing operation
 recovers. Repeated reports are deduplicated until recovery; a later recurrence
 reports again.
@@ -57,6 +61,35 @@ character records. It disables spacers and automatic chat updates, preserves
 macros and existing non-spacer anchor offsets, and lets native spacer removal
 clean up links.
 
+### Versioned CVar cleanup
+
+The [CVar migration contract](specs/cvar-migrations/PRODUCT.md) and
+[implementation/authoring guide](specs/cvar-migrations/TECH.md) define upgrades.
+`CalmUITweaksDB.cvarVersion` is the last completed step, independent of release
+and general settings versions. Missing means 0; migration 1 retires gathering
+settings. Steps run in order after login and checkpoint only after completion.
+Reset preserves the checkpoint and pending ledgers. Invalid or future versions
+preserve saved data and block CVar writes without readiness polling. Quest CVar
+validation and application wait until all migration steps complete; unrelated
+features continue normally.
+
+### Retired targeting settings
+
+Ore/herb sparkles have no module, toggle, animations or target/nameplate event
+subscriptions. For accounts pending migration 1, the cleanup module validates
+`gatheringSparkles.restore` against the eight former targeting CVars, retaining
+only recognized applied values and string baselines. Preparation removes the
+old enabled preference immediately
+and deletes the saved ledger after restoring still-owned values or observing
+later external writes. It never sets targeting defaults or touches quest graphics.
+
+Cleanup starts after login, defers through combat and unavailable console APIs,
+and retains failed restores across reset, reload and character changes. Only
+pending cleanup subscribes to world/variable readiness and relevant CVar changes;
+combat-end is subscribed only while waiting. Own writes schedule no work. Fresh
+installs and completed cleanup have no cleanup frame subscriptions or polling.
+The existing module status/error boundary reports pending work and failures.
+
 ## Feature contracts
 
 ### Quest loot sparkles
@@ -81,32 +114,6 @@ clean up links.
 - Turning the mode off can require a full game restart to remove lingering
   sparkles on Forever; `/reload` is insufficient according to the researched
   addon's documentation. This client behavior requires installed-game validation.
-
-### Gathering sparkles
-
-- An independent account toggle on General defaults off. One reusable golden
-  glint cluster marks only the nearest soft-targeted ore vein or herb. NPCs,
-  quest objects and unrelated interactions are excluded. There is no range or
-  skill feedback, custom asset or quest-log scan.
-- Native cursor texture IDs, paths or atlases identify mining/herbalism targets.
-  Forbidden or unreadable targets/plates are skipped. The interaction plate is
-  resolved directly or through matching nameplate unit tokens.
-- Native alpha animation groups twinkle at fixed positions, stopping on target
-  loss, removal, pending combat changes or disable. Target/nameplate changes,
-  world entry, variable readiness and relevant console changes coalesce updates.
-  No Lua frame updates or polling run. Unrelated NPC plate events are ignored.
-- While enabled, `SoftTargetInteract=3`, `SoftTargetInteractRange=15`,
-  `SoftTargetInteractArc=2`, `SoftTargetInteractOnlyInRange=0`,
-  `SoftTargetIconInteract=1`, `SoftTargetIconGameObject=1` and
-  `SoftTargetLowPriorityIcons=1`. `SoftTargetNameplateInteract` is 1 only for
-  detected gathering nodes, otherwise 0. Interaction icons can affect other
-  objects. The actual detection radius is client-owned and unverified in game.
-- Both sparkle modules use the shared owned-console-variable helper.
-  `gatheringSparkles.restore` retains original values through owned nameplate
-  gating transitions, reloads, character changes and reset. Disable restores
-  only still-owned settings. Missing APIs/variables wait; failed writes report.
-  Combat-end is subscribed only while work is pending. Disabled idle features
-  have no subscriptions; pending restoration retains readiness events.
 
 ### LFG leader location
 
@@ -139,7 +146,9 @@ clean up links.
   24 by 24; native size controls accept dimensions from 1 to 2000.
 - Size and standalone position are account-wide. EUI owns attached placement,
   propagation and size matching. Save/Discard callbacks preserve geometry.
-- Registration/removal waits until outside combat and any active edit session.
+- Registration/removal waits until outside combat and any active edit session,
+  including combat-suspended sessions. Native open/close notifications retain
+  session state even while the editor's visible-active query is false.
   Removal uses `UnregisterUnlockElement`, which also removes native links.
 
 ### Player/Target corner alignment
@@ -180,7 +189,9 @@ clean up links.
 - Secure post-hooks on EUI's shared placement/reapply helpers notify changed
   unlock keys. There is no frame watcher. Reapply and propagation use native EUI
   APIs; queued mutations stop outside editing and defer through combat. Native
-  Save/Discard owns persistence.
+  Save/Discard owns persistence. Session listeners remain authoritative during
+  combat suspension and lifecycle refreshes; a hidden editor does not end the
+  session or disable automation when editing resumes.
 
 ### Chat sharing
 
@@ -188,7 +199,11 @@ clean up links.
   tab, message groups and channel names. Older formats are rejected.
 - Capture, import and apply filter groups against nonempty runtime `ChatTypeGroup`
   definitions. Unsupported groups are omitted; malformed transfer data is rejected.
-  Missing runtime definitions defer application.
+  Missing runtime definitions defer application. Valid manual requests also wait
+  for missing dock/frame/tab instances and retain the selected layout and saved
+  date. Imports cancel pending manual work. Missing API functions, unsupported
+  frame contracts and insufficient tab capacity reject manual requests without
+  retaining readiness listeners; users can retry after resolving the cause.
 - Apply matches existing normal windows by name, reuses available user windows,
   allocates missing windows through native APIs and closes extra normal tabs.
   Combat-log filters, reserved voice windows and temporary windows remain local.
@@ -226,7 +241,7 @@ clean up links.
   before login and during combat. The current name and status refresh in place.
 - Compatibility shows live bag and training status. Bag scope toggles are
   disabled while bag item levels are off, preserving their saved choices.
-- On General and Compatibility, bag feature/scope controls require loaded
+- On Compatibility, bag feature/scope controls require loaded
   EllesmereUIBags; the training toggle requires loaded WhatsTraining. Native
   disabled states grey out unavailable controls with dependency tooltips, without
   altering preferences. Dependency checks use `C_AddOns.IsAddOnLoaded`, prefer
@@ -246,12 +261,15 @@ clean up links.
   their item level exceeds equipped gear. Either paired ring/trinket slot may
   be empty; two-handed candidates require both weapon slots empty. The offhand
   exclusion still applies. Green-or-better comparisons and all labels are unchanged.
-- Bag opening, content events, equipment changes while visible and scope changes
-  trigger coalesced updates. Unchanged results and pending item callbacks are
-  reused. Native texture, quality and refresh writes do no item queries.
+- Bag opening, content events, equipment/level changes while visible and scope
+  changes trigger coalesced updates. Level changes invalidate upgrade colors
+  outside combat; hidden and disabled scopes have no level-up subscription.
+  Unchanged results and pending item callbacks are reused. Native texture, quality and refresh writes do no item queries.
   Equipped item levels are cached per open/equipment refresh. Item-data events
   are subscribed only for pending equipped lookups; unrelated and duplicate
   completions do not schedule work. Failed loads wait for a later normal refresh.
+  Pending-request bookkeeping expires when completion listeners stop, so reopening
+  retries requests whose results could have been missed while all scopes were hidden.
   Hidden/disabled scopes do not scan or compare. Combat changes defer and
   stale callbacks cannot repaint recycled buttons. Disable restores owned native
   visibility without changing native text or SIL saved settings.
@@ -293,7 +311,13 @@ clean up links.
   layouts are cached; hidden pooled rows are skipped until shown. Pooled widgets
   are picked up on normal layout/show events. Disabling the fix or
   spellbook skin restores owned alpha, fonts, shadows, colors and markup and
-  hides created decorations, retaining later native or external writes.
+  hides created decorations, retaining later native or external writes. Failed
+  restoration writes retain ownership and report an error rather than claiming
+  the feature is disabled successfully; later restoration attempts retry them.
+  FontObject restoration retains dependent instance-font and shadow baselines
+  across partial failures. Immediate alpha enforcement requires an active
+  supported spellbook skin; switching that skin off preserves later native alpha
+  writes even if a previous restoration failed.
 - Compatibility fixes default on. Protected restoration waits through combat.
 
 Font assets and SharedMedia registration are outside this plugin. Packages
@@ -342,27 +366,34 @@ Before a release, verify on the installed Forever/EUI build:
   near a lootable quest object; check normal/raid outline changes, graphics
   presets, reload, character switch, combat deferral, disable/reset restoration
   and a full game restart. Confirm ore/herb approach effects are absent.
-- [ ] Enable gathering sparkles independently near ore/herbs. Confirm nameplate
-  anchoring, golden native animation, target loss/recycling and no NPC/quest
-  decorations. Walk between nodes and test world transitions, fallback plate
-  tokens, combat, reload, reset and restoration of prior soft-target settings.
-  Record and inspect the animation and transitions on the installed client.
+- [ ] Upgrade from saved gathering settings. Confirm there is no gathering
+  toggle/search result/effect, still-owned targeting CVars restore, later external
+  values survive, and pending cleanup survives combat/reload without polling.
+  Confirm quest loot sparkles remain independent and available.
 - [ ] Open all six pages, use search, check status and confirm settings survive
   reload and remain independent of EUI profile changes. Check row packing at
   different UI scales and that saving/importing the first chat default enables
-  Apply Default and Export Default immediately.
+  Apply Default and Export Default immediately. Confirm General contains only
+  sparkle/LFG controls and live status; macro and compatibility settings have
+  one home each. Change feature status while another EUI module is selected:
+  that page must remain untouched, and returning to the plugin must refresh its
+  cached controls and status. Check wrapped status text at different UI scales.
 - [ ] Use Rename Macro, cancel once, confirm a valid name, and reject an invalid
   name. Check current name/status after page switching and reload. Toggle bag
   item levels and anchor automation; dependent controls must refresh in place
   and keep their saved values. Check rename availability through combat.
 - [ ] With EllesmereUIBags or WhatsTraining absent/disabled, confirm their
-  controls are greyed out on General and Compatibility, dependency tooltips are
-  clear, and saved preferences survive reload. If loaded later, controls must
+  controls are greyed out on Compatibility, dependency tooltips are clear,
+  and saved preferences survive reload. If loaded later, controls must
   refresh without rebuilding the page, including patches saved off.
 - [ ] Exercise all spacers, centered-bar chains, resizing, removal, Save/Discard,
-  facing corners, scales, manual nudges and combat transitions.
+  facing corners, scales, manual nudges and combat transitions. Queue a spacer
+  enable/disable during editing, enter combat, and confirm the change waits
+  through automatic editor resumption until the edit session actually closes.
 - [ ] Create side and action/CDM corner links with asymmetric gaps, including zero.
-  Confirm outward-only spacing, growth alignment, reload and unchanged existing links.
+  Confirm outward-only spacing, growth alignment, reload and unchanged existing
+  links. Suspend editing through combat, trigger a relevant EUI addon load, then
+  resume and create a new link; automatic gaps must still apply.
 - [ ] Roundtrip chat exports and apply across characters with missing/extra tabs,
   unsupported groups, delayed channels and reserved voice windows. Confirm styling
   preservation and one-time automatic updates after chat becomes ready.
@@ -372,7 +403,10 @@ Before a release, verify on the installed Forever/EUI build:
 - [ ] With SimpleItemLevel disabled, compare bag-open CPU usage against the bag
   item-level switch off, including idle open bags and equipment/non-equipment
   loot. Check paired rings/trinkets, weapon rules, pending equipped data, native
-  label restoration, scope switches, reload and combat transitions.
+  label restoration, scope switches, reload and combat transitions. Close bags
+  during an equipped-item data request, reopen after a failed completion, and
+  check recovery. Level up with an above-level upgrade visible; its red arrow
+  must clear when the item becomes usable.
 - [ ] Compare training fonts, tab icons/selection, icon rings, dropdowns, page
   arrows and header lines with the native spellbook. Switch categories and
   reopen WT in both skins. Hover the class/weapon toggle and confirm stable FPS.

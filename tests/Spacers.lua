@@ -2,7 +2,7 @@
 local tests = 0
 local function fixture(db, charDB, lateListener)
     local ns, frames, registry, links, timers = {}, {}, {}, {}, {}
-    local combat, active, listener = false, false, nil
+    local combat, active, sessionActive, listener = false, false, false, nil
     local registrations, removals = 0, 0
     local env = setmetatable({ CalmUITweaksDB = db, CalmUITweaksCharDB = charDB }, { __index = _G })
     env._G = env
@@ -33,12 +33,12 @@ local function fixture(db, charDB, lateListener)
     env.EllesmereUI = eui
     function eui:RegisterUnlockElements(elements, folder)
         assert(self == eui and folder == "CalmEUITweaks")
-        assert(not combat and not active, "registration during combat/session")
+        assert(not combat and not sessionActive, "registration during combat/session")
         registrations = registrations + 1
         for _, element in ipairs(elements) do registry[element.key] = element end
     end
     function eui:UnregisterUnlockElement(key)
-        assert(not combat and not active, "removal during combat/session")
+        assert(not combat and not sessionActive, "removal during combat/session")
         registry[key] = nil
         links[key] = nil
         for child, target in pairs(links) do if target == key then links[child] = nil end end
@@ -48,6 +48,7 @@ local function fixture(db, charDB, lateListener)
     function eui:RegisterUnlockModeListener(owner, callback)
         assert(owner == "CalmEUITweaks_Spacers")
         listener = callback
+        if sessionActive then listener(true) end
     end
     function eui:UnregisterUnlockModeListener(owner)
         assert(owner == "CalmEUITweaks_Spacers")
@@ -80,7 +81,12 @@ local function fixture(db, charDB, lateListener)
     local s = { ns = ns, eui = eui, registry = registry, links = links, frames = frames }
     function s:element(index) return registry["CalmUITweaks_Spacer" .. (index or 1)] end
     function s:combat(value) combat = value end
-    function s:session(value) active = value; if listener then listener(value) end end
+    function s:session(value)
+        active, sessionActive = value, value
+        if listener then listener(value) end
+    end
+    function s:suspend() assert(sessionActive); active = false end
+    function s:resume() assert(sessionActive); active = true end
     function s:fire(event)
         for _, frame in ipairs(frames) do
             if frame.events[event] then frame.scripts.OnEvent(frame, event) end
@@ -222,6 +228,46 @@ test("preference changes defer until native edit session closes", function()
     s:session(false); s:flush()
     assert(s:element(3))
 end)
+test("pending spacer changes wait through combat suspension and resume until real close", function()
+    local s = fixture({spacers = {spacer1 = true}})
+    local original = s:element()
+    s.links.player = original.key
+    s:session(true)
+    s.ns.SetSetting("spacers", "spacer1", false)
+    s.ns.SetSetting("spacers", "spacer2", true)
+    s:combat(true); s:suspend()
+    s:fire("PLAYER_ENTERING_WORLD")
+    assert(s.frames[1].events.PLAYER_REGEN_ENABLED)
+    s:combat(false); s:fire("PLAYER_REGEN_ENABLED"); s:flush()
+    assert(s:element() == original and not s:element(2))
+    assert(s.links.player == original.key, "Suspension must preserve native links")
+    assert(not s.frames[1].events.PLAYER_REGEN_ENABLED, "Session wait needs no combat listener")
+    s:resume(); s:fire("PLAYER_ENTERING_WORLD"); s:flush()
+    assert(s:element() == original and not s:element(2))
+    s:session(false); s:flush()
+    assert(not s:element() and s:element(2) and not s.links.player)
+    local registrations, removals = s:counts()
+    assert(registrations == 2 and removals == 1)
+end)
+
+test("enabling from idle during suspension receives the existing session lifetime", function()
+    local s = fixture()
+    assert(not s:hasListener())
+    s:session(true); s:combat(true); s:suspend()
+    s.ns.SetSetting("spacers", "spacer1", true)
+    assert(s:hasListener())
+    s:combat(false); s:fire("PLAYER_REGEN_ENABLED"); s:flush()
+    assert(not s:element(), "Immediate listener notification must survive the inactive query")
+    s:resume(); s:flush()
+    assert(not s:element())
+    s:session(false); s:flush()
+    assert(s:element())
+    s.ns.SetSetting("spacers", "spacer1", false)
+    assert(not s:hasListener() and not next(s.frames[1].events))
+    s.ns.SetSetting("spacers", "spacer1", true)
+    assert(s:element(), "Released session state must not block later enables")
+end)
+
 test("repeat world and addon events do not re-register existing elements", function()
     local s = fixture({spacers = {spacer1 = true}})
     local eventChanges = s.frames[1].eventChanges

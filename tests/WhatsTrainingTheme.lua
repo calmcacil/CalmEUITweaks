@@ -723,4 +723,144 @@ equal(replacementTab:GetAlpha(), 0.7, "Spellbook skin off restores native tab se
 equal(ns.errors.whatsTraining, nil, "Theme lifecycle remains error-free")
 check(not main.scripts.OnUpdate and not overlay.scripts.OnUpdate, "Theme does not poll")
 
+-- Restore failures must retain both owned values and FontObject side effects.
+style = "eui"
+enabled = true; module:ApplySettings(); drain()
+local setTitleFont = main.title.SetFont
+main.title.SetFont = function() return false end
+enabled = false; module:ApplySettings()
+check(ns.errors.whatsTraining ~= nil, "Rejected restoration is reported")
+equal(main.title.fontObject, foreignFont, "FontObject restoration still runs before instance font")
+equal(main.title.font[2], 19, "Failed instance restore exposes the FontObject size")
+equal(#queue, 0, "Failed restore does not start timer polling")
+main.title.SetFont = setTitleFont
+enabled = true; module:ApplySettings(); drain()
+enabled = false; module:ApplySettings()
+equal(main.title.font[1], "ExternalInstance.ttf", "On/off retry preserves the original instance face")
+equal(main.title.font[2], 25, "Retry restores instance size after prior FontObject side effects")
+equal(ns.errors.whatsTraining, nil, "Successful restoration clears the error")
+
+enabled = true; module:ApplySettings(); drain()
+local setTitleObject = main.title.SetFontObject
+main.title.SetFontObject = function() error("FontObject restore blocked") end
+enabled = false; module:ApplySettings()
+check(ns.errors.whatsTraining ~= nil, "Throwing FontObject restore is reported")
+main.title.SetFontObject = setTitleObject
+module:ApplySettings()
+equal(main.title.fontObject, foreignFont, "Retry restores the rejected FontObject")
+equal(main.title.font[1], "ExternalInstance.ttf", "Retry preserves dependent font ownership")
+equal(main.title.font[2], 25, "Retry preserves dependent instance size")
+equal(main.title.shadow[1], 0.6, "Retry restores dependent shadow color")
+equal(main.title.offset[1], 3, "Retry restores dependent shadow offset")
+
+enabled = true; module:ApplySettings(); drain()
+local setBackingAlpha = cover.backing.SetAlpha
+cover.backing.SetAlpha = function() end
+enabled = false; module:ApplySettings()
+check(ns.errors.whatsTraining ~= nil, "Silent rejected restore fails read-back verification")
+equal(cover.backing:GetAlpha(), 0, "Rejected alpha remains pending")
+cover.backing.SetAlpha = setBackingAlpha
+module:ApplySettings()
+equal(cover.backing:GetAlpha(), 0.4, "Retry restores still-owned alpha")
+equal(ns.errors.whatsTraining, nil, "Verified alpha restoration recovers")
+
+enabled = true; module:ApplySettings(); drain()
+cover.backing.SetAlpha = function() error("Alpha restore blocked") end
+enabled = false; module:ApplySettings()
+check(ns.errors.whatsTraining ~= nil, "Throwing alpha restore is reported")
+cover.backing.SetAlpha = setBackingAlpha
+cover.backing:SetAlpha(0.65)
+module:ApplySettings()
+equal(cover.backing:GetAlpha(), 0.65, "External writes supersede a failed restoration")
+equal(ns.errors.whatsTraining, nil, "External ownership release resolves pending restore")
+
+enabled = true; module:ApplySettings(); drain()
+local getTitleFont = main.title.GetFont
+local unreadableFont = false
+main.title.GetFont = function(self)
+    if unreadableFont then error("Font read-back unavailable") end
+    return getTitleFont(self)
+end
+main.title.SetFontObject = function(self, value)
+    setTitleObject(self, value)
+    unreadableFont = true
+end
+enabled = false; module:ApplySettings()
+check(ns.errors.whatsTraining ~= nil, "Unreadable FontObject side effects remain pending")
+main.title.SetFontObject, main.title.GetFont = setTitleObject, getTitleFont
+module:ApplySettings()
+equal(main.title.font[1], "ExternalInstance.ttf", "Retry retains baseline after unreadable FontObject side effects")
+equal(main.title.font[2], 25, "Unreadable read-back does not lose instance size ownership")
+equal(ns.errors.whatsTraining, nil, "Readable restoration recovers")
+
+enabled = true; module:ApplySettings(); drain()
+local setTitleColor, setTitleText = main.title.SetTextColor, main.title.SetText
+main.title.SetTextColor = function() return false end
+main.title.SetText = function() error("Text restore blocked") end
+enabled = false; module:ApplySettings()
+check(ns.errors.whatsTraining ~= nil, "Rejected color and throwing text restores are reported")
+check(main.title.value ~= "|cff301f0fTraining|r", "Failed text restore is still themed")
+main.title.SetTextColor, main.title.SetText = setTitleColor, setTitleText
+module:ApplySettings()
+equal(main.title.color[2], 0.82, "Retry restores original text color")
+equal(main.title.value, "|cff301f0fTraining|r", "Retry restores original inline markup")
+equal(ns.errors.whatsTraining, nil, "Text and color restoration clears errors")
+equal(#queue, 0, "Restoration retries remain manual without polling")
+
+enabled = true; module:ApplySettings(); drain()
+local getTitleColor, getTitleText = main.title.GetTextColor, main.title.GetText
+local unreadableColor, unreadableText = false, false
+main.title.GetTextColor = function(self)
+    if unreadableColor then error("Color read-back unavailable") end
+    return getTitleColor(self)
+end
+main.title.GetText = function(self)
+    if unreadableText then error("Text read-back unavailable") end
+    return getTitleText(self)
+end
+main.title.SetTextColor = function(self)
+    self.color = {0.25, 0.25, 0.25, 1}
+    unreadableColor = true
+    return false
+end
+main.title.SetText = function(self)
+    self.value = "partial restore"
+    unreadableText = true
+    return false
+end
+enabled = false; module:ApplySettings()
+check(ns.errors.whatsTraining ~= nil, "Partial unreadable text/color writes remain pending")
+main.title.GetTextColor, main.title.GetText = getTitleColor, getTitleText
+main.title.SetTextColor, main.title.SetText = setTitleColor, setTitleText
+module:ApplySettings()
+equal(main.title.color[2], 0.82, "Own partial color write is not treated as external")
+equal(main.title.value, "|cff301f0fTraining|r", "Own partial string write is not treated as external")
+equal(ns.errors.whatsTraining, nil, "Verified text/color retry recovers")
+
+enabled = true; module:ApplySettings(); drain()
+cover.backing.SetAlpha = function() error("Style-off alpha restore blocked") end
+style = "off"; EllesmereUI._WSkinRefreshStyles(); drain()
+check(ns.errors.whatsTraining ~= nil, "Style-off restoration failure remains visible")
+cover.backing.SetAlpha = setBackingAlpha
+cover.backing:SetAlpha(0.7)
+equal(cover.backing:GetAlpha(), 0.7, "Inactive skin must not reassert alpha over a later native write")
+drain()
+equal(cover.backing:GetAlpha(), 0.7, "Style-off recovery preserves the native alpha baseline")
+equal(ns.errors.whatsTraining, nil, "Native write allows failed style-off restoration to recover")
+style = "eui"
+
+enabled = true; module:ApplySettings(); drain()
+local setNativeAlpha = book.PagedSpellsFrame.SetAlpha
+book.PagedSpellsFrame.SetAlpha = function() error("Native alpha restore blocked") end
+PlayerSpellsFrame:Hide()
+overlay:Hide()
+drain()
+check(ns.errors.whatsTraining ~= nil, "Hidden refresh does not clear a pending native restoration error")
+equal(book.PagedSpellsFrame:GetAlpha(), 0, "Failed hide restoration retains native alpha ownership")
+equal(#queue, 0, "Failed hidden restoration does not poll")
+book.PagedSpellsFrame.SetAlpha = setNativeAlpha
+module:ApplySettings(); drain()
+equal(book.PagedSpellsFrame:GetAlpha(), 0.75, "Explicit hidden retry restores native content")
+equal(ns.errors.whatsTraining, nil, "Successful hidden retry clears restoration error")
+
 print("PASS: WhatsTraining full theme (" .. passed .. " assertions)")

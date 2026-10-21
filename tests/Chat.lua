@@ -493,4 +493,69 @@ local invalidAuto, invalidAutoNS, invalidAutoChat = New({ autoApply = true,
 invalidAuto:Login(); invalidAuto:Flush()
 Check(invalidAuto.writes == 0 and next(invalidAuto.events[1].events) == nil,
     "An invalid saved default releases automatic readiness subscriptions")
+do
+    local waiting, waitingNS, waitingChat = New(Copy(account))
+    local definitions = ChatTypeGroup
+    local chosen = Copy(waitingNS.db.chat.default)
+    ChatTypeGroup = nil
+    Check(not waitingChat.ApplyDefault() and waiting.writes == 0,
+        "Manual apply waits for runtime group definitions without native writes")
+    Check(waiting.events[1].events.CHANNEL_UI_UPDATE and #waiting.timers == 0,
+        "Manual readiness wait subscribes to events without polling")
+    Check(waitingChat.GetSummary():find("not ready", 1, true), "Summary identifies readiness instead of combat")
+    waitingNS.db.chat.default.export = "not the chosen preset"
+    waitingNS.db.chat.default.savedAt = chosen.savedAt + 10
+    ChatTypeGroup = definitions
+    waiting.combat = true; waiting:Event("CHANNEL_UI_UPDATE")
+    Check(waiting.writes == 0 and waiting.events[1].events.PLAYER_REGEN_ENABLED,
+        "Readiness completion during combat still defers native changes")
+    waiting.combat = false; waiting:Event("PLAYER_REGEN_ENABLED")
+    Check(waiting.writes > 0 and waitingNS.charDB.chat.appliedExport == chosen.export
+        and waitingNS.charDB.chat.appliedSavedAt == chosen.savedAt,
+        "Manual deferred work retains the selected default identity")
+    Check(next(waiting.events[1].events) == nil, "Completed manual readiness work releases listeners")
+end
+
+for _, missing in ipairs({"dock", "frame", "tab"}) do
+    local waiting, _, waitingChat = New(Copy(account))
+    local savedDock, savedFrame, savedTab = GENERAL_CHAT_DOCK, waiting.windows[4], ChatFrame4Tab
+    if missing == "dock" then GENERAL_CHAT_DOCK = nil
+    elseif missing == "frame" then waiting.windows[4] = nil
+    else ChatFrame4Tab = nil end
+    Check(not waitingChat.ApplyDefault() and waiting.events[1].events.PLAYER_ENTERING_WORLD,
+        "Manual apply retains work while native " .. missing .. " is not created")
+    GENERAL_CHAT_DOCK, waiting.windows[4], ChatFrame4Tab = savedDock, savedFrame, savedTab
+    waiting:Event("PLAYER_ENTERING_WORLD"); waiting:Flush()
+    Check(not waitingChat.NeedsApply(), "Manual apply resumes after native " .. missing .. " creation")
+end
+
+do
+    local waiting, _, waitingChat = New(Copy(account))
+    local definitions = ChatTypeGroup
+    ChatTypeGroup = nil; waitingChat.ApplyDefault(); ChatTypeGroup = definitions
+    Check(waitingChat.ImportDefault(exported), "Import can replace a readiness-pending manual default")
+    waiting:Event("CHANNEL_UI_UPDATE"); waiting:Event("PLAYER_ENTERING_WORLD"); waiting:Flush()
+    Check(waiting.writes == 0 and next(waiting.events[1].events) == nil,
+        "Import cancels manual readiness work without applying its replacement")
+end
+
+for _, unsupported in ipairs({"api", "capacity", "malformed"}) do
+    local rejected, rejectedNS, rejectedChat = New(Copy(account))
+    if unsupported == "api" then FCF_SetWindowName = nil
+    elseif unsupported == "capacity" then Constants.ChatFrameConstants.MaxChatWindows = 3
+    else rejectedNS.db.chat.default.export = "invalid preset" end
+    Check(not rejectedChat.ApplyDefault() and rejected.writes == 0
+        and next(rejected.events[1].events) == nil and #rejected.timers == 0,
+        "Manual " .. unsupported .. " rejection must not leave readiness listeners")
+end
+
+do
+    local waiting, _, waitingChat = New(Copy(account))
+    local definitions = ChatTypeGroup
+    ChatTypeGroup = nil; waitingChat.ApplyDefault(); ChatTypeGroup = definitions
+    FCF_SetWindowName = nil
+    waiting:Event("CHANNEL_UI_UPDATE")
+    Check(waiting.writes == 0 and next(waiting.events[1].events) == nil,
+        "A terminal API failure releases previously queued manual readiness work")
+end
 print("Chat tests passed: " .. passed)
