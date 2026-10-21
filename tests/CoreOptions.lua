@@ -990,6 +990,7 @@ local function checkVisiblePages(s)
         truth(s:build(page) > 0, "page height must be positive")
     end
     local bindings = {
+        ["Cursor washed-out fix"] = { "cursorWashedOut", "enabled" },
         ["Quest loot sparkles"] = { "questLootSparkles", "enabled" },
         ["LFG leader location"] = { "lfgLeaderLocation", "enabled" },
         ["Maintain character macro"] = { "mageMacro", "enabled" },
@@ -1058,7 +1059,7 @@ end
 test("General owns only standalone tweaks and other settings have one home", function()
     local s = optionsFixture():initialize():login()
     local expected = {
-        General = { "Quest loot sparkles", "LFG leader location" },
+        General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix" },
         ["Mage Macro"] = { "Maintain character macro" },
         Compatibility = { "Enable bag / bank item levels", "Inventory bags", "Reagent bags", "Bank", "Match spellbook theme" },
     }

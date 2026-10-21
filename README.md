@@ -19,7 +19,7 @@ necessary. Restart the client after installation.
 
 Open `/calmtweaks`, or select **Calm UI Tweaks > Calm's Tweaks** in EUI.
 The pages are General, Mage Macro, Compatibility, Chat, Spacers and Anchors.
-General contains the sparkle and LFG toggles with live feature status. Configure
+General contains the sparkle, LFG and cursor fix toggles with live feature status. Configure
 macro maintenance on Mage Macro and bag/training features on Compatibility.
 Use `/calmtweaks status` to check dependencies and errors.
 
@@ -32,6 +32,7 @@ Use `/calmtweaks status` to check dependencies and errors.
 | WhatsTraining fix | Enabled | Themes the training tab to match EUI's spellbook, including backgrounds, fonts and controls. |
 | Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
 | LFG leader location | Off | Shows the leader's current zone beside each LFG activity. |
+| Cursor washed-out fix | Off | Disables the hardware cursor to work around washed-out cursor colors. |
 | Chat sharing | Manual; automatic updates off | Shares normal tabs, docking order, message groups and channel subscriptions. |
 | Spacer anchors | All four off | Adds invisible, resizable elements to EUI Unlock Mode. |
 | Player/Target corners | EUI Default | Aligns facing corners when these frames are anchored to a spacer. |
@@ -66,6 +67,19 @@ Location data updates when the native LFG result refreshes; unavailable zones
 and labels without enough room stay hidden. Disabling or resetting preferences
 hides the labels immediately. The setting is account-wide and defaults off.
 
+## Cursor washed-out fix
+
+Enable **Cursor washed-out fix** on **General** if your cursor appears pale or
+washed out. It sets `HardwareCursor` to `0`, using a software cursor. This can
+cause cursor lag or flickering; disable the fix if responsiveness suffers.
+
+The account-wide toggle defaults off. Disabling or resetting restores the prior
+CVar value only if it still matches this feature's last write. Restoration
+survives reloads and character changes, and changes wait through combat.
+If you already disabled the hardware cursor manually, enabling this feature
+does not acquire that value; disabling it will leave your manual workaround on.
+To restore the hardware cursor manually, use `/console hardwareCursor 1`.
+
 ## Quest loot sparkles
 
 Enable **Quest loot sparkles** on **General** to use the client's native sparkle
@@ -92,8 +106,9 @@ subsequent changes by you or another addon are preserved. Cleanup waits through
 combat or unavailable APIs, keeps unfinished records across reloads, and removes
 the obsolete settings when complete. The account-wide `schemaVersion` now tracks
 all saved-data migrations. Existing 0.6.x `cvarVersion = 1` data adopts that completed
-cleanup and upgrades to schema 2 without replaying it. After login, an existing
-account gets one notice such as `savedvarsdb updated from "1" to "2"`; fresh and
+cleanup and upgrades to schema 3 without replaying it. Step 3 adds the cursor fix
+preference, defaulting off without changing the native cursor. After login, an existing
+account gets one notice such as `savedvarsdb updated from "2" to "3"`; fresh and
 already-current accounts stay silent.
 
 `/calmtweaks status` reports upgrade progress or errors. Features and options

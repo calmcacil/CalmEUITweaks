@@ -30,6 +30,8 @@ character migration counter is deferred until a character schema change needs it
    adopts general schema versioning, removes the recognized obsolete account
    `version` and `cvarVersion` fields, and migrates the old shared anchor gap into
    missing side preferences. Existing side preferences take precedence.
+   Step 3 adds the default-off cursor fix preference without native CVar writes,
+   preserving any existing cursor fix subtree.
 
 4. Every outstanding step runs in order. Its checkpoint advances only on verified
    success. Failures stop the chain; later steps never run early. Reload resumes

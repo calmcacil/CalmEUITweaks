@@ -133,7 +133,7 @@ local function New(account, character, current, options)
 end
 
 local fresh = New(nil, nil, nil, {combat = true, noAPI = true}):initialize()
-Check(fresh.ns.db.schemaVersion == 2 and fresh.ns.db.version == nil and fresh.ns.db.cvarVersion == nil,
+Check(fresh.ns.db.schemaVersion == 3 and fresh.ns.db.version == nil and fresh.ns.db.cvarVersion == nil,
     "Fresh data reaches the canonical target without legacy metadata")
 Check(fresh.ns.defaults.schemaVersion == nil, "Schema checkpoints must remain outside preference defaults")
 Check(fresh.feature.initialized == 1 and fresh.feature.login == 0 and fresh.feature.applied == 0,
@@ -147,25 +147,32 @@ Check(fresh.feature.initialized == 1 and fresh.feature.login == 1 and fresh.feat
     "Repeated startup events cannot repeat feature callbacks")
 
 for _, checkpoint in ipairs({{}, {cvarVersion = 0}, {cvarVersion = 1}, {schemaVersion = 0},
-    {schemaVersion = 1}, {schemaVersion = 2}}) do
+    {schemaVersion = 1}, {schemaVersion = 2}, {schemaVersion = 3}}) do
     local account = Copy(checkpoint)
     account.keep = "old data"
     local initial = account.schemaVersion or account.cvarVersion or 0
     local s = New(account, {version = 1}):initialize()
-    Check(s.ns.db == account and account.schemaVersion == 2, "Recognized checkpoints upgrade in the original root")
+    Check(s.ns.db == account and account.schemaVersion == 3, "Recognized checkpoints upgrade in the original root")
     Check(account.cvarVersion == nil and account.version == nil and account.keep == "old data",
         "General adoption removes known old markers and retains other data")
     Check(#s:notices() == 0, "Upgrade notices wait until login")
     s:login()
     local notices = s:notices()
-    Check((initial == 2 and #notices == 0) or (#notices == 1
-        and notices[1]:find('"' .. initial .. '" to "2"', 1, true)),
+    Check((initial == 3 and #notices == 0) or (#notices == 1
+        and notices[1]:find('"' .. initial .. '" to "3"', 1, true)),
         "Existing data announces only an actual completed version advance")
     s.ns.ResetSettings(); s:event("PLAYER_ENTERING_WORLD"); s:flush()
-    Check(#s:notices() == #notices and account.schemaVersion == 2, "Reset and later events cannot replay notices or migrations")
+    Check(#s:notices() == #notices and account.schemaVersion == 3, "Reset and later events cannot replay notices or migrations")
 end
 
 local adopted = Legacy()
+local cursorUpgrade = New({schemaVersion = 2}):initialize()
+Check(cursorUpgrade.ns.db.schemaVersion == 3 and cursorUpgrade.ns.db.cursorWashedOut.enabled == false
+    and #cursorUpgrade.writes == 0, "Schema 2 upgrade adds a default-off cursor fix without native writes")
+local cursorRecord = {enabled = true, restore = {HardwareCursor = {before = "1", applied = "0"}}, keep = true}
+local cursorExisting = New({schemaVersion = 2, cursorWashedOut = Copy(cursorRecord)}):initialize()
+Check(Same(cursorExisting.ns.db.cursorWashedOut, cursorRecord),
+    "Cursor migration preserves existing preferences, ownership and unknown fields")
 adopted.cvarVersion = 1
 local staleLedger = Copy(adopted.gatheringSparkles)
 local noReplay = New(adopted, {version = 1}):initialize():login()
@@ -178,7 +185,7 @@ Check(adopted.anchorGap.top == 3 and adopted.anchorGap.bottom == 7 and adopted.a
 local cases = {
     {account = false}, {account = "bad"}, {account = 7},
     {character = false}, {character = "bad"}, {character = 7},
-    {account = {schemaVersion = 3}}, {account = {schemaVersion = "2"}},
+    {account = {schemaVersion = 4}}, {account = {schemaVersion = "2"}},
     {account = {schemaVersion = false}}, {account = {schemaVersion = -1}},
     {account = {schemaVersion = 0.5}}, {account = {schemaVersion = math.huge}},
     {account = {schemaVersion = 0 / 0}}, {account = {schemaVersion = {}}},
@@ -230,7 +237,7 @@ Check(pending:hasEvent("PLAYER_REGEN_ENABLED") and #pending.writes == 0,
 pending.combat = false
 pending:event("PLAYER_REGEN_ENABLED"); pending:flush()
 for name, value in pairs(original) do Check(pending.cv[name] == value, "Historical cleanup restores " .. name) end
-Check(pending.ns.db.schemaVersion == 2 and pending.ns.db.gatheringSparkles == nil
+Check(pending.ns.db.schemaVersion == 3 and pending.ns.db.gatheringSparkles == nil
     and pending.ns.db.anchorGap.right == 7, "Cleanup completion allows ordered data adoption and defaults")
 Check(pending.feature.initialized == 1 and pending.feature.login == 1 and pending.feature.applied == 1,
     "Deferred readiness resumes each feature lifecycle callback exactly once")
@@ -245,13 +252,13 @@ local unavailable = New(Legacy(), nil, nil, {noAPI = true}):initialize():login()
 Check(unavailable.ns.settingsPending and not unavailable.ns.db and #unavailable.writes == 0,
     "Missing CVar APIs preserve a pending raw upgrade")
 unavailable:restoreAPI(); unavailable:event("VARIABLES_LOADED"); unavailable:flush()
-Check(unavailable.ns.db.schemaVersion == 2 and unavailable.feature.login == 1, "API readiness resumes startup")
+Check(unavailable.ns.db.schemaVersion == 3 and unavailable.feature.login == 1, "API readiness resumes startup")
 local missingValues = Copy(applied); missingValues.SoftTargetInteractRange = nil
 local missing = New(Legacy(), nil, missingValues):initialize():login()
 Check(#missing.writes == 0 and missing.ns.settingsPending, "Missing owned CVar prevents partial cleanup")
 missing.cv.SoftTargetInteractRange = "15"
 missing:event("PLAYER_ENTERING_WORLD"); missing:flush()
-Check(missing.cv.SoftTargetInteractRange == "10" and missing.ns.db.schemaVersion == 2,
+Check(missing.cv.SoftTargetInteractRange == "10" and missing.ns.db.schemaVersion == 3,
     "A later world readiness event completes missing CVar cleanup")
 
 for _, failure in ipairs({"reject", "throw", "silent"}) do
@@ -263,7 +270,7 @@ for _, failure in ipairs({"reject", "throw", "silent"}) do
     Check(raw.anchorGap.pixels == 7 and raw.anchorGap.right == nil and #failed:notices() == 0,
         "Native failure cannot run later transformations or announce completion")
     local resumed = New(raw, failed.env.CalmUITweaksCharDB, failed.cv):initialize():login()
-    Check(resumed.ns.db.schemaVersion == 2 and resumed.cv.SoftTargetInteractRange == "10",
+    Check(resumed.ns.db.schemaVersion == 3 and resumed.cv.SoftTargetInteractRange == "10",
         "Reload retries the unfinished native cleanup")
     for _, name in ipairs(resumed.writes) do
         Check(name ~= "SoftTargetInteract", "Reload does not rewrite already-restored native values")
@@ -281,7 +288,7 @@ local oldMode = Legacy()
 oldMode.gatheringSparkles.restore.SoftTargetNameplateInteract.applied = "1"
 local nodeValues = Copy(applied); nodeValues.SoftTargetNameplateInteract = "1"
 local node = New(oldMode, nil, nodeValues):initialize():login()
-Check(node.ns.db.schemaVersion == 2 and node.cv.SoftTargetNameplateInteract == "1",
+Check(node.ns.db.schemaVersion == 3 and node.cv.SoftTargetNameplateInteract == "1",
     "Historical cleanup recognizes both nameplate modes")
 
 for _, mode in ipairs({"false", "throw", "nonboolean"}) do
@@ -350,9 +357,9 @@ local quest = New(questAccount, nil, questValues, {quest = true, reject = "SoftT
 Check(quest.cv.graphicsOutlineMode == "2" and quest.feature.initialized == 0,
     "Quest graphics cannot apply before the whole account schema is ready")
 quest.reject = nil; quest:event("PLAYER_ENTERING_WORLD"); quest:flush()
-Check(quest.ns.db.schemaVersion == 2 and quest.cv.graphicsOutlineMode == "0",
+Check(quest.ns.db.schemaVersion == 3 and quest.cv.graphicsOutlineMode == "0",
     "Quest uses its latest preference after schema readiness")
-Check(quest.ns.ResetSettings() and quest.ns.db.schemaVersion == 2 and not quest.ns.db.questLootSparkles.enabled
+Check(quest.ns.ResetSettings() and quest.ns.db.schemaVersion == 3 and not quest.ns.db.questLootSparkles.enabled
     and quest.cv.graphicsOutlineMode == "2", "Ready reset preserves checkpoint and restores owned quest settings")
 
 local accountLayouts = {schemaVersion = 2, spacerLayouts = {[1] = {width = 40, height = 10}}}
