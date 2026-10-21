@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.5.0...v0.6.0) (2026-10-21)
+
+
+### Features
+
+* **cvar:** add versioned CVar migrations ([#27](https://github.com/calmcacil/CalmEUITweaks/issues/27)) ([d48a73f](https://github.com/calmcacil/CalmEUITweaks/commit/d48a73fa296a08bfa21c5d50a96e1a69453803c5))
+
 ## [0.5.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.4.0...v0.5.0) (2026-10-15)
 
 
