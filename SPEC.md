@@ -68,7 +68,9 @@ The [CVar migration contract](specs/cvar-migrations/PRODUCT.md) and
 `CalmUITweaksDB.cvarVersion` is the last completed step, independent of release
 and general settings versions. Missing means 0; migration 1 retires gathering
 settings. Steps run in order after login and checkpoint only after completion.
-Reset preserves the checkpoint and pending ledgers. Invalid or future versions
+Upgrading saved data prints one chat notice naming the starting and completed
+versions; fresh installs and already-current accounts stay silent. Reset preserves
+the checkpoint and pending ledgers. Invalid or future versions
 preserve saved data and block CVar writes without readiness polling. Quest CVar
 validation and application wait until all migration steps complete; unrelated
 features continue normally.

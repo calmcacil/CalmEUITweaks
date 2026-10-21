@@ -72,12 +72,17 @@ sparkle behavior.
     targeting cleanup: safety takes precedence over partially applying the new
     CVar policy. Macro, chat, bag, anchor, and other unrelated features continue.
 
-13. Existing status reporting distinguishes completed, pending, combat-deferred,
+13. Existing saved data announces a completed upgrade once in chat, naming the
+    previous and new versions (for example, `savedvarsdb updated from "0" to "1"`).
+    Fresh installs and accounts already at the current version stay silent, and
+    later logins or repeated lifecycle events do not repeat the message.
+
+14. Existing status reporting distinguishes completed, pending, combat-deferred,
     failed, and unsupported-version states. Cleanup uses bounded lifecycle or
     relevant CVar notifications, never polling or repeating timers. Completed
     migrations and unsupported-version states have no migration event subscriptions.
 
-14. A feature's current-definition validation cannot discard an old restoration
+15. A feature's current-definition validation cannot discard an old restoration
     record before its historical migration has had a chance to process it. After
     migrations complete, current settings apply without repeated writes when
     their live values already match.
