@@ -2,7 +2,7 @@ local _, ns = ...
 local module = { asyncErrors = true }
 ns.RegisterModule("migrations", module)
 
-ns.SCHEMA_VERSION = 2
+ns.SCHEMA_VERSION = 3
 -- Append steps and raise the target together; shipped definitions are immutable.
 ns.schemaMigrations = {
     [1] = {
@@ -32,6 +32,12 @@ ns.schemaMigrations = {
                 gaps.pixels = nil
             end
             db.version, db.cvarVersion = nil, nil
+            return true
+        end,
+    },
+    [3] = {
+        migrate = function(db)
+            if db.cursorWashedOut == nil then db.cursorWashedOut = { enabled = false } end
             return true
         end,
     },

@@ -20,8 +20,9 @@ using a fresh `EllesmereUI.BlankRowCfg()` for that slot. Hidden search builds us
 and page restoration refresh cached labels in place. Native widget refreshes run
 only when this plugin's module is active, without rebuilding pages or refreshing
 another module. Module lookup and native refresh errors use the shared options
-boundary. General contains only the quest sparkle and LFG controls in one full
-row, with cached live status for both. Macro and compatibility controls
+boundary. General contains quest sparkle and LFG controls in one full row,
+then the cursor fix in the final row with a fresh blank right slot, with cached
+live status for all three. Macro and compatibility controls
 appear only on their dedicated pages.
 Module and page errors are isolated and clear when the failing operation
 recovers. Repeated reports are deduplicated until recovery; a later recurrence
@@ -31,7 +32,7 @@ reports again.
 
 | Store | Contents |
 | --- | --- |
-| `CalmUITweaksDB` | Account preferences, saved chat default, spacer geometry (`spacerLayouts`) and sparkle console-variable restoration records. |
+| `CalmUITweaksDB` | Account preferences, saved chat default, spacer geometry (`spacerLayouts`) and sparkle/cursor console-variable restoration records. |
 | `CalmUITweaksCharDB` | Macro ownership, chat apply records and corner baselines tied to native EUI anchors. |
 | EUI layout | Native anchor and size-match links, including offsets and growth pins. |
 
@@ -68,10 +69,12 @@ clean up links.
 The [SavedVariables contract](specs/saved-variables/PRODUCT.md) and
 [implementation/authoring guide](specs/saved-variables/TECH.md) define upgrades.
 `CalmUITweaksDB.schemaVersion` is the last completed account migration; the code
-currently requires version 2. Missing canonical metadata adopts only recognized
+currently requires version 3. Missing canonical metadata adopts only recognized
 legacy `cvarVersion` 0/1, otherwise starts at 0. Step 1 retains gathering cleanup;
 step 2 removes recognized obsolete account markers and migrates shared anchor gaps.
-Steps checkpoint in order only after success. Pure-data failures discard tentative
+Step 3 adds the default-off cursor fix preference without native writes and preserves
+any existing subtree. Steps checkpoint in order only after success.
+Pure-data failures discard tentative
 changes; native cleanup retains unresolved ownership for retry.
 
 The checkpoint is outside preference defaults and survives reset. Unknown,
@@ -128,6 +131,23 @@ The existing module status/error boundary reports pending work and failures.
 - Turning the mode off can require a full game restart to remove lingering
   sparkles on Forever; `/reload` is insufficient according to the researched
   addon's documentation. This client behavior requires installed-game validation.
+
+### Cursor washed-out fix
+
+- One account toggle on General defaults off. Enabled sets `HardwareCursor=0`
+  to use the software cursor for washed-out cursor colors. It does not change
+  gamma, other graphics settings or cursor size. The tooltip explains possible
+  cursor lag or flickering.
+- Uses the shared owned-CVar helper. `cursorWashedOut.restore` persists the
+  prior/applied value across reloads and characters. Already-matching values
+  are not acquired. Disable/reset restores only still-owned values, preserves
+  external writes and retains failed restoration records for retry.
+- Relevant CVar changes and variable/world readiness coalesce reapplication.
+  Own writes and unrelated changes schedule no work. Changes defer in combat;
+  combat-end listeners exist only while pending. Disabled/idle releases events.
+  Missing APIs or variables wait; failed writes use the module error boundary.
+- In game, verify cursor colors and responsiveness, toggle/disable/reset,
+  preexisting manual workaround, reload, search/page switching and combat deferral.
 
 ### LFG leader location
 

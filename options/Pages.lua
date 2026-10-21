@@ -146,10 +146,13 @@ local function BuildPage(page, parent, y)
             "Enables native quest-object sparkles by disabling normal and raid outlines. Off by default. Disabling restores owned graphics settings; restart the game to remove lingering sparkles."),
             Toggle("lfgLeaderLocation", "enabled", "LFG leader location",
                 "Shows each leader's current zone beside the activity in Looking For Group. Helps judge travel progress; does not measure distance to a summoning stone. Off by default."))
+        Row(Toggle("cursorWashedOut", "enabled", "Cursor washed-out fix",
+            "Disables the hardware cursor to fix washed-out cursor colors. May cause cursor lag or flickering. Off by default. Disabling restores the previous setting only if still owned."))
         Text(nil, function()
             return "Quest loot sparkles: " .. ns.GetStatus("questLootSparkles")
                 .. "\nLFG leader location: " .. ns.GetStatus("lfgLeaderLocation")
-        end, 60)
+                .. "\nCursor washed-out fix: " .. ns.GetStatus("cursorWashedOut")
+        end, 80)
     elseif page == "Mage Macro" then
         Section("MAGE FOOD AND WATER")
         Row(Toggle("mageMacro", "enabled", "Maintain character macro",

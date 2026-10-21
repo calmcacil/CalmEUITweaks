@@ -11,11 +11,11 @@ be replaced, not retained as a second migration system.
 
 ## Proposed changes
 
-### One runner and two concrete steps
+### One runner and three concrete steps
 
 Use [core/Migrations.lua](../../core/Migrations.lua), registered as `migrations`
 through the existing module registry, in place of `LegacyCVars.lua`. Declare
-`ns.SCHEMA_VERSION = 2` and a contiguous `ns.schemaMigrations` table. Each entry is
+`ns.SCHEMA_VERSION = 3` and a contiguous `ns.schemaMigrations` table. Each entry is
 either a historical CVar cleanup descriptor (`settingsKey`, full old `values`,
 optional `retired`) or a pure-data `migrate(candidate)` function returning literal
 true on verified completion. Never silently treat a missing step as complete.
@@ -23,6 +23,8 @@ true on verified completion. Never silently treat a missing step as complete.
 - Step 1 preserves the old gathering names, applied values and restoration rules.
 - Step 2 removes recognized account `version`/`cvarVersion`, and performs the
   existing shared `anchorGap.pixels` migration before defaults obscure absence.
+- Step 3 seeds a missing `cursorWashedOut` subtree with `enabled = false`,
+  preserving existing values and making no native writes.
 
 The generic runner checkpoints after each successful entry. Pure-data callbacks
 receive a temporary deep copy using the existing copy helper; on true completion,
