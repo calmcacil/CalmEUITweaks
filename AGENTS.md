@@ -104,11 +104,12 @@ explicit user instruction, follow the user instruction.
 - `tests/`: mocked Lua regressions.
 - `scripts/` and `.github/`: validation, packaging, and releases.
 
-From the repository root, run `bash scripts/check.sh` with Python 3, Lua 5.1,
-`luac5.1`, ShellCheck, and actionlint available. It runs source validation, Lua
-syntax checks, all Lua regression tests, shell lint, and workflow lint. Use the
-Bash harness in Git Bash or WSL on Windows; `scripts/test.sh` creates the
-`CalmEUITweaks/` path that the test fixtures expect.
+From the repository root, trust the project config with `mise trust`, then run
+`mise install` followed by `mise run check`. The project config pins Lua 5.1,
+Python 3, ShellCheck, and actionlint. The check task runs source validation, Lua
+syntax checks, all Lua regression tests, shell lint, and workflow lint. It needs
+Bash (Git Bash or WSL on Windows);
+`scripts/test.sh` creates the `CalmEUITweaks/` path that the test fixtures expect.
 
 Add focused regression tests for bugs or material behavior changes. Do not add
 tests that only mirror the implementation or assert cosmetic source formatting.

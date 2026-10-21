@@ -10,6 +10,9 @@ ignore:
   - release-please-config.json
   - renovate.json
   - VERSION
+  - mise.toml
+  - mise.lock
+  - artifacts
   - AGENTS.md
   - SPEC.md
   - tests

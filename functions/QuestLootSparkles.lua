@@ -12,15 +12,18 @@ local values = {
 local watched = { graphicsquality = true, raidgraphicsquality = true }
 for _, entry in ipairs(values) do watched[string.lower(entry[1])] = true end
 local events = CreateFrame("Frame")
-
-function module:Initialize()
-    ns.InitializeCVarRestore(ns.GetSettings("questLootSparkles"), values)
-end
+local restoreInitialized = false
 
 function module:ApplySettings()
-    local settings = ns.GetSettings("questLootSparkles")
-    local enabled = settings.enabled
     events:UnregisterAllEvents()
+    local ready, reason = ns.CVarMigrationsReady()
+    if not ready then ns.SetStatus("questLootSparkles", reason); return end
+    local settings = ns.GetSettings("questLootSparkles")
+    if not restoreInitialized then
+        ns.InitializeCVarRestore(settings, values)
+        restoreInitialized = true
+    end
+    local enabled = settings.enabled
     if enabled then
         events:RegisterEvent("CVAR_UPDATE")
     elseif not next(settings.restore) then

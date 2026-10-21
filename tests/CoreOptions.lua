@@ -244,6 +244,17 @@ local function enablePluginAPI(s)
     s.pluginCalls, s.openPluginCalls = 0, 0
     eui.PLUGIN_API_VERSION = 1
     eui.IsSearchPrebuild = function() return false end
+    s.activeModule = "plugin:" .. addonName .. ":Tweaks"
+    eui.GetPluginModuleKey = function(name, key, ...)
+        equal(name, addonName, "GetPluginModuleKey must be a dot call")
+        equal(key, "Tweaks")
+        equal(select("#", ...), 0)
+        if s.pluginRegistration then return "plugin:" .. name .. ":" .. key end
+    end
+    function eui:GetActiveModule()
+        equal(self, eui, "GetActiveModule must be a method call")
+        return s.activeModule
+    end
     eui.RegisterPlugin = function(name, config, ...)
         equal(name, addonName, "RegisterPlugin must be a dot call")
         equal(select("#", ...), 0, "RegisterPlugin argument count")
@@ -969,11 +980,7 @@ local function checkVisiblePages(s)
         truth(s:build(page) > 0, "page height must be positive")
     end
     local bindings = {
-        ["Mage food / water macro"] = { "mageMacro", "enabled" },
-        ["Bag item levels"] = { "simpleItemLevel", "enabled" },
-        ["WhatsTraining spellbook theme"] = { "whatsTraining", "enabled" },
         ["Quest loot sparkles"] = { "questLootSparkles", "enabled" },
-        ["Ore / herb sparkles"] = { "gatheringSparkles", "enabled" },
         ["LFG leader location"] = { "lfgLeaderLocation", "enabled" },
         ["Maintain character macro"] = { "mageMacro", "enabled" },
         ["Enable bag / bank item levels"] = { "simpleItemLevel", "enabled" },
@@ -1037,6 +1044,97 @@ local function checkVisiblePages(s)
     s:storageUnchanged()
 end
 
+
+test("General owns only standalone tweaks and other settings have one home", function()
+    local s = optionsFixture():initialize():login()
+    local expected = {
+        General = { "Quest loot sparkles", "LFG leader location" },
+        ["Mage Macro"] = { "Maintain character macro" },
+        Compatibility = { "Enable bag / bank item levels", "Inventory bags", "Reagent bags", "Bank", "Match spellbook theme" },
+    }
+    local before = copy(s.ns.db)
+    for page, labels in pairs(expected) do
+        s.rows = {}
+        s:build(page)
+        local actual = {}
+        for _, row in ipairs(s.rows) do
+            for _, cfg in ipairs({ row.left, row.right }) do
+                if cfg.type == "toggle" then actual[#actual + 1] = cfg.text end
+            end
+        end
+        same(actual, labels, page .. " toggle ownership")
+    end
+    same(s.ns.db, before, "navigation must not change preferences")
+end)
+
+test("General status follows live changes and cached-page restoration", function()
+    local s = optionsFixture():initialize():login()
+    s:build("General")
+    local label = s:findLabel("Quest loot sparkles:")
+    local count, rows = #s.labels, #s.rows
+    s.ns.SetStatus("questLootSparkles", "Disabled")
+    s.ns.SetStatus("lfgLeaderLocation", "Waiting for combat to end.")
+    contains(label.text, "Quest loot sparkles: Disabled")
+    contains(label.text, "LFG leader location: Waiting for combat to end.")
+    s.ns.ReportError("lfgLeaderLocation", "test failure")
+    contains(label.text, "LFG leader location: Error: test failure")
+    s.ns.ClearError("lfgLeaderLocation")
+    contains(label.text, "LFG leader location: Waiting for combat to end.")
+    s.ns.statuses.lfgLeaderLocation = "Active"
+    s.pluginRegistration.modules[1].onPageCacheRestore("General")
+    contains(label.text, "LFG leader location: Active")
+    equal(#s.labels, count, "status changes reuse labels")
+    equal(#s.rows, rows, "status changes do not rebuild controls")
+end)
+
+test("options refresh only our active module and retain hidden status updates", function()
+    local s = optionsFixture():initialize():login()
+    local eui, calls = s.env.EllesmereUI, 0
+    s:build("Mage Macro")
+    local label = s:findLabel("Macro name:")
+    eui.RefreshPage = function(self, force)
+        equal(self, eui)
+        equal(force, nil)
+        calls = calls + 1
+    end
+    s.activeModule = "EllesmereUIBags"
+    s.ns.SetStatus("mageMacro", "Waiting for spell data.")
+    contains(label.text, "Waiting for spell data.")
+    equal(calls, 0, "must not refresh a native EUI page")
+    s.activeModule = nil
+    s.ns.RefreshOptions()
+    equal(calls, 0, "must not refresh without an active module")
+    s.activeModule = "plugin:" .. addonName .. ":Tweaks"
+    s.pluginRegistration.modules[1].onPageCacheRestore("Mage Macro")
+    equal(calls, 1, "restoring our cached page refreshes widgets")
+    eui.GetPluginModuleKey = function() return nil end
+    s.ns.RefreshOptions()
+    equal(calls, 1, "unregistered plugins must not refresh")
+end)
+
+test("missing or failing active-module APIs never refresh unrelated pages", function()
+    local s = optionsFixture():initialize():login()
+    local eui = s.env.EllesmereUI
+    local key, active = eui.GetPluginModuleKey, eui.GetActiveModule
+    eui.RefreshPage = function() error("unexpected page refresh", 0) end
+    eui.GetPluginModuleKey = nil
+    s.ns.RefreshOptions()
+    equal(s.ns.errors.options, nil)
+    eui.GetPluginModuleKey, eui.GetActiveModule = key, nil
+    s.ns.RefreshOptions()
+    equal(s.ns.errors.options, nil)
+    eui.GetActiveModule = function() error("active module lookup failed", 0) end
+    s.ns.RefreshOptions()
+    contains(s.ns.GetStatus("options"), "active module lookup failed")
+    eui.GetActiveModule = active
+    s.activeModule = "OtherAddon"
+    s.ns.RefreshOptions()
+    truth(s.ns.errors.options, "skipping refresh is not recovery")
+    eui.RefreshPage = function() end
+    s.activeModule = "plugin:" .. addonName .. ":Tweaks"
+    s.ns.RefreshOptions()
+    equal(s.ns.errors.options, nil, "successful own-page refresh recovers")
+end)
 
 test("native visible pages retain noCapture settings and isolated widget writes", function()
     local s = optionsFixture():initialize():login()
@@ -1237,7 +1335,7 @@ test("dependent scopes and gap sliders refresh in place with their parent switch
     end
 end)
 
-test("missing compatibility addons grey out both pages without changing preferences", function()
+test("missing compatibility addons grey out their controls without changing preferences", function()
     for _, loaded in ipairs({ {}, { EllesmereUIBags = true }, { WhatsTraining = true },
         { EllesmereUIBags = true, WhatsTraining = true } }) do
         local s = optionsFixture({ loadedAddons = loaded }):initialize():login()
@@ -1245,12 +1343,10 @@ test("missing compatibility addons grey out both pages without changing preferen
         s:build("General")
         s:build("Compatibility")
         local dependencies = {
-            ["Bag item levels"] = "EllesmereUIBags",
             ["Enable bag / bank item levels"] = "EllesmereUIBags",
             ["Inventory bags"] = "EllesmereUIBags",
             ["Reagent bags"] = "EllesmereUIBags",
             ["Bank"] = "EllesmereUIBags",
-            ["WhatsTraining spellbook theme"] = "WhatsTraining",
             ["Match spellbook theme"] = "WhatsTraining",
         }
         local checked = 0
@@ -1267,7 +1363,7 @@ test("missing compatibility addons grey out both pages without changing preferen
                 end
             end
         end
-        equal(checked, 7)
+        equal(checked, 5)
         same(s.ns.db, before)
         same(s.ns.charDB, charBefore)
         s:storageUnchanged()
@@ -1311,15 +1407,12 @@ test("late compatibility addon loads refresh cached controls even when the patch
     s.loadedAddons.EllesmereUIBags = true
     s:event("ADDON_LOADED", "EllesmereUIBags")
     equal(calls, 1)
-    equal(states["Bag item levels"], false)
     equal(states["Enable bag / bank item levels"], false)
     equal(states["Inventory bags"], true, "scopes remain disabled while their parent is off")
-    equal(states["WhatsTraining spellbook theme"], true)
     equal(states["Match spellbook theme"], true)
     s.loadedAddons.WhatsTraining = true
     s:event("ADDON_LOADED", "WhatsTraining")
     equal(calls, 2)
-    equal(states["WhatsTraining spellbook theme"], false)
     equal(states["Match spellbook theme"], false)
     s.loadedAddons.WhatsTraining = nil
     s.pluginRegistration.modules[1].onPageCacheRestore("Compatibility")

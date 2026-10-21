@@ -38,6 +38,7 @@ local chrome = setmetatable({}, {__mode = "k"})
 local ownedRegions = setmetatable({}, {__mode = "k"})
 local ownedLayouts = setmetatable({}, {__mode = "k"})
 local nativeHidden = setmetatable({}, {__mode = "k"})
+local nativeRestorePending = false
 local textRoles = setmetatable({}, {__mode = "k"})
 local fontRoles = setmetatable({}, {__mode = "k"})
 local unpackValues = unpack
@@ -224,17 +225,20 @@ local function TrackProperty(object, key)
                 local native = ReadProperty(self, changed)
                 if saved[changed] and native then
                     saved[changed].original, saved[changed].applied = native, nil
+                    saved[changed].restorePending = nil
                 end
             end
             -- Hover animations frequently rewrite artwork alpha. Keep faded
             -- artwork owned by this skin in place without scheduling a tree walk.
-            if key == "Alpha" and applied and Enabled() then
+            if key == "Alpha" and applied and Enabled() and activeColors and UsesDarkStyle() then
                 if WriteProperty(self, key, applied) then saved[key].applied = applied end
                 return
             end
             if key == "FontObject" then saved.shadow = nil end
             if Enabled() then ScheduleApply() end
         end) then record[key] = nil; return end
+    elseif state.restorePending then
+        state.applied, state.restorePending = current, nil
     elseif not SameProperty(current, state.applied, key) then
         state.original, state.applied = current, nil
     end
@@ -251,11 +255,23 @@ end
 local function RestoreProperty(object, key)
     local record = appearance[object]
     local state = record and record[key]
-    if not state then return end
-    if state.applied and SameProperty(ReadProperty(object, key), state.applied, key) then
-        WriteProperty(object, key, state.original)
+    if not state or (not state.applied and not state.restorePending) then return true end
+    local current = ReadProperty(object, key)
+    if not current then return false end
+    if not state.restorePending and not SameProperty(current, state.applied, key) then
+        state.applied = nil
+        return true
     end
-    state.applied = nil
+    local written = WriteProperty(object, key, state.original)
+    current = ReadProperty(object, key)
+    if written and SameProperty(current, state.original, key) then
+        state.applied, state.restorePending = nil, nil
+        return true
+    end
+    -- A rejected setter can still change the property; retain our latest write.
+    if current then state.applied = current end
+    state.restorePending = not current or nil
+    return false
 end
 
 local function AdaptFont(text, colors)
@@ -661,40 +677,65 @@ end
 local function WriteColor(text, color)
     local wasApplying = applying
     applying = true
-    local ok = pcall(text.SetTextColor, text, color[1], color[2], color[3], color[4])
+    local ok, result = pcall(text.SetTextColor, text, color[1], color[2], color[3], color[4])
     applying = wasApplying
-    return ok
+    return ok and result ~= false
 end
 
 local function WriteString(text, value)
     local wasApplying = applying
     applying = true
-    local ok = pcall(text.SetText, text, value)
+    local ok, result = pcall(text.SetText, text, value)
     applying = wasApplying
-    return ok
+    return ok and result ~= false
 end
 
 local function RestoreColor(text, state)
-    if state.applied and SameColor(ReadColor(text), state.applied) then
-        WriteColor(text, state.original)
+    if not state.applied and not state.restoreColorPending then return true end
+    local current = ReadColor(text)
+    if not current then return false end
+    if not state.restoreColorPending and not SameColor(current, state.applied) then
+        state.applied = nil
+        return true
     end
-    state.applied = nil
+    local written = WriteColor(text, state.original)
+    current = ReadColor(text)
+    if written and SameColor(current, state.original) then
+        state.applied, state.restoreColorPending = nil, nil
+        return true
+    end
+    if current then state.applied = current end
+    state.restoreColorPending = not current or nil
+    return false
 end
 
 local function RestoreText(text, state)
-    RestoreColor(text, state)
+    local restored = RestoreColor(text, state)
+    if not state.appliedText and not state.restoreTextPending then return restored end
     local current, readable = ReadString(text)
-    if readable and state.appliedText and current == state.appliedText then
-        WriteString(text, state.originalText)
+    if not readable then return false end
+    if not state.restoreTextPending and current ~= state.appliedText then
+        state.appliedText = nil
+        return restored
     end
-    state.appliedText = nil
+    local written = WriteString(text, state.originalText)
+    current, readable = ReadString(text)
+    if written and readable and current == state.originalText then
+        state.appliedText, state.restoreTextPending = nil, nil
+        return restored
+    end
+    if readable then state.appliedText = current end
+    state.restoreTextPending = not readable or current == nil or nil
+    return false
 end
 
 local function AdaptString(text, state, colors)
     if not state.trackText then return end
     local current, readable = ReadString(text)
     if not readable then return end
-    if not state.appliedText or current ~= state.appliedText then
+    if state.restoreTextPending then
+        state.appliedText, state.restoreTextPending = current, nil
+    elseif not state.appliedText or current ~= state.appliedText then
         state.originalText = current
         state.appliedText = nil
     end
@@ -705,27 +746,44 @@ local function AdaptString(text, state, colors)
 end
 
 local function RestoreAll()
+    local restored = true
     for object, record in pairs(appearance) do
-        -- Restoring a FontObject also changes face/size/shadow. Capture ownership
-        -- first, then restore those properties together, retaining foreign writes.
-        local values = {}
+        -- FontObject restoration overwrites instance font/shadow values. Capture
+        -- their destinations first, including foreign writes we must preserve.
+        local values, fontReady = {}, true
         local fontObject = record.FontObject
-        local restoreFontObject = fontObject and fontObject.applied
-            and SameProperty(ReadProperty(object, "FontObject"), fontObject.applied, "FontObject")
-        for _, key in ipairs(PROPERTY_ORDER) do
-            local state = record[key]
-            if state then
-                local current = ReadProperty(object, key)
-                if state.applied and SameProperty(current, state.applied, key) then
-                    values[key] = state.original
-                elseif restoreFontObject and (key == "Font" or key == "ShadowColor" or key == "ShadowOffset") then
-                    values[key] = current
+        local restoreFontObject = fontObject and (fontObject.applied or fontObject.restorePending)
+        if restoreFontObject then
+            for _, key in ipairs({"Font", "ShadowColor", "ShadowOffset"}) do
+                local state = record[key]
+                if state then
+                    local current = ReadProperty(object, key)
+                    if not current then fontReady = false
+                    elseif state.restorePending or (state.applied and SameProperty(current, state.applied, key)) then
+                        values[key] = state.original
+                    else values[key] = current end
                 end
-                state.applied = nil
             end
         end
-        for _, key in ipairs(PROPERTY_ORDER) do
-            if values[key] then WriteProperty(object, key, values[key]) end
+        if fontReady then
+            local fontRestored = RestoreProperty(object, "FontObject")
+            if not fontRestored then restored = false end
+            if restoreFontObject then
+                for key, value in pairs(values) do
+                    local state = record[key]
+                    state.original = value
+                    state.applied = ReadProperty(object, key)
+                    state.restorePending = not state.applied or nil
+                end
+            end
+            for _, key in ipairs(PROPERTY_ORDER) do
+                if key ~= "FontObject" then
+                    local dependent = key == "Font" or key == "ShadowColor" or key == "ShadowOffset"
+                    if not (dependent and not fontRestored) and not RestoreProperty(object, key) then restored = false end
+                end
+            end
+        else
+            restored = false
         end
         record.shadow = nil
         record.fontApplied = nil
@@ -733,8 +791,14 @@ local function RestoreAll()
     for _, record in pairs(chrome) do
         for _, region in pairs(record) do region:SetAlpha(0) end
     end
-    for text, state in pairs(states) do RestoreText(text, state) end
-    for object in pairs(nativeHidden) do nativeHidden[object] = nil end
+    for text, state in pairs(states) do
+        if not RestoreText(text, state) then restored = false end
+    end
+    for object in pairs(nativeHidden) do
+        local state = appearance[object] and appearance[object].Alpha
+        if not state or (not state.applied and not state.restorePending) then nativeHidden[object] = nil end
+    end
+    if not restored then error("Training theme restoration is incomplete; retry disabling the fix.", 0) end
 end
 
 local function AdaptText(text, colors, override)
@@ -754,7 +818,7 @@ local function AdaptText(text, colors, override)
             local native = ReadColor(self)
             if saved and native then
                 saved.original = native
-                saved.applied = nil
+                saved.applied, saved.restoreColorPending = nil, nil
             end
             RefreshText(self)
         end) then
@@ -767,7 +831,7 @@ local function AdaptText(text, colors, override)
             local native, readable = ReadString(self)
             if saved then
                 if readable then saved.originalText = native end
-                saved.appliedText = nil
+                saved.appliedText, saved.restoreTextPending = nil, nil
             end
             RefreshText(self)
         end
@@ -777,13 +841,17 @@ local function AdaptText(text, colors, override)
         end
     end
     AdaptString(text, state, colors)
-    if not SameColor(current, state.applied) then
+    if state.restoreColorPending then
+        state.applied, state.restoreColorPending = current, nil
+    elseif not SameColor(current, state.applied) then
         state.original = current
         state.applied = nil
     end
     local color = override or colors[textRoles[text]] or SemanticColor(state.original, colors)
     if not color then
-        RestoreColor(text, state)
+        if not RestoreColor(text, state) then
+            error("Training theme restoration is incomplete; retry disabling the fix.", 0)
+        end
         return
     end
     local desired = {color[1], color[2], color[3], state.original[4]}
@@ -850,10 +918,13 @@ local function AdaptPage(page, colors)
 end
 
 local function RestoreNative()
+    local restored = true
     for object in pairs(nativeHidden) do
-        RestoreProperty(object, "Alpha")
-        nativeHidden[object] = nil
+        if RestoreProperty(object, "Alpha") then nativeHidden[object] = nil
+        else restored = false end
     end
+    nativeRestorePending = not restored
+    if not restored then error("Training theme restoration is incomplete; retry disabling the fix.", 0) end
 end
 
 local function StyleSpellIcon(frame, colors)
@@ -1060,7 +1131,12 @@ local function ApplyVisuals(frame, colors)
             ApplyProperty(nativeTab, "Alpha", {0})
         end
         for object in pairs(nativeHidden) do
-            if not current[object] then RestoreProperty(object, "Alpha"); nativeHidden[object] = nil end
+            if not current[object] then
+                if not RestoreProperty(object, "Alpha") then
+                    error("Training theme restoration is incomplete; retry disabling the fix.", 0)
+                end
+                nativeHidden[object] = nil
+            end
         end
     else RestoreNative() end
     local seen = {}
@@ -1108,7 +1184,13 @@ local function InstallHooks()
     HookPage(_G.WhatsTrainingLauncher)
     local installed = overlay and hooks[overlay]
     if installed and not installed.restoreNative and type(overlay.HookScript) == "function" then
-        overlay:HookScript("OnHide", RestoreNative)
+        overlay:HookScript("OnHide", function()
+            local ok, err = pcall(RestoreNative)
+            if not ok then
+                ns.ReportError(KEY, err)
+                SetStatus(ns.errors[KEY])
+            end
+        end)
         installed.restoreNative = true
     end
     local root = _G.PlayerSpellsFrame
@@ -1151,6 +1233,7 @@ local function Apply()
     end
     local root = _G.PlayerSpellsFrame
     if root and not Shown(root) then
+        if nativeRestorePending then RestoreNative() end
         SetStatus("Active: " .. style .. " spellbook theme")
         return
     end

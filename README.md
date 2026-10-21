@@ -3,8 +3,8 @@
 A companion addon for [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/)
 on WoW Forever. It adds spacer anchors, automatic anchor gaps, shared chat
 setups, a mage food/water macro, bag item levels and potential upgrade markers,
-quest-object and gathering sparkles, LFG leader locations, and a compatibility
-fix for WhatsTraining.
+quest-object sparkles, LFG leader locations, and a compatibility fix for
+WhatsTraining.
 
 ## Requirements and installation
 
@@ -19,6 +19,8 @@ necessary. Restart the client after installation.
 
 Open `/calmtweaks`, or select **Calm UI Tweaks > Calm's Tweaks** in EUI.
 The pages are General, Mage Macro, Compatibility, Chat, Spacers and Anchors.
+General contains the sparkle and LFG toggles with live feature status. Configure
+macro maintenance on Mage Macro and bag/training features on Compatibility.
 Use `/calmtweaks status` to check dependencies and errors.
 
 ## Features and defaults
@@ -29,7 +31,6 @@ Use `/calmtweaks status` to check dependencies and errors.
 | Bag item levels | Enabled for all scopes | Displays equipment item levels and potential upgrade arrows in EUI inventory, reagent bags and bank. |
 | WhatsTraining fix | Enabled | Themes the training tab to match EUI's spellbook, including backgrounds, fonts and controls. |
 | Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
-| Ore / herb sparkles | Off | Marks the nearest soft-targeted ore vein or herb with golden glints. |
 | LFG leader location | Off | Shows the leader's current zone beside each LFG activity. |
 | Chat sharing | Manual; automatic updates off | Shares normal tabs, docking order, message groups and channel subscriptions. |
 | Spacer anchors | All four off | Adds invisible, resizable elements to EUI Unlock Mode. |
@@ -44,10 +45,11 @@ The addon uses no `OnUpdate` handlers or repeating tickers. Anchor changes use
 native EUI notifications and secure placement hooks; disabled features release
 their event subscriptions. The bag display skips hidden/disabled scopes and
 reuses unchanged item results.
-Opening bags and bag/bank content events trigger updates; equipment changes
-refresh comparisons while bags are visible. Repeated native texture, quality and
-refresh calls do no item queries. Equipped item-data notifications are subscribed
-only while a requested lookup is pending.
+Opening bags and bag/bank content events trigger updates; equipment and level
+changes refresh comparisons while bags are visible. Repeated native texture,
+quality and refresh calls do no item queries. Equipped item-data notifications
+are subscribed only while a requested lookup is pending in a visible scope;
+reopening bags retries requests whose completion could have been missed.
 Training theme passes skip the hidden spellbook and unchanged native font writes;
 showing the spellbook applies pending theme changes.
 
@@ -69,8 +71,7 @@ hides the labels immediately. The setting is account-wide and defaults off.
 Enable **Quest loot sparkles** on **General** to use the client's native sparkle
 effect on lootable quest objects. This disables normal and raid outline
 highlighting. Graphics changes reapply the sparkle settings while enabled;
-there is no polling or custom animation. Ore and herb sparkles use a separate
-toggle described below.
+there is no polling or custom animation.
 
 Disabling or resetting the toggle restores graphics values changed by this
 feature when they still match its last writes. Previous values survive reloads
@@ -83,24 +84,18 @@ that addon and restart the game. Console variables persist independently of
 addons. Calm UI Tweaks cannot recover graphics values previously changed by
 another addon; values already configured for sparkles are left as found.
 
-## Ore / herb sparkles
+## Upgrading from gathering sparkles
 
-Enable **Ore / herb sparkles** on **General** to add golden glints to the nearest
-soft-targeted ore vein or herb. This is independent of quest loot sparkles and
-does not change outline graphics. The effect uses native animations and target
-and nameplate events, with no Lua frame updates or polling.
-
-This simple version has a fixed appearance: no distance brightness or skill
-colors. It marks one nearby node, not every visible node. The requested targeting
-range is 15 yards; actual range and node detection depend on the Forever client.
-This feature still needs installed-game validation.
-
-The toggle enables soft interaction targeting and its icons, which can also
-affect interaction cues for other nearby objects. Interaction nameplates are
-requested only for detected gathering nodes. During pending combat changes the
-effect is hidden until combat ends. Disabling stops animations immediately and
-restores still-owned targeting settings outside combat; restoration records
-survive reloads, character switches and preference resets.
+Ore/herb sparkles have been removed. On upgrade, the addon restores targeting
+settings recorded by the old feature only when they still match its last writes;
+subsequent changes by you or another addon are preserved. Cleanup waits through
+combat or unavailable APIs, keeps unfinished records across reloads, and removes
+the obsolete settings when complete. `/calmtweaks status` reports cleanup errors
+or pending work. The account-wide `cvarVersion` records completed cleanup steps
+and survives preference resets. Quest loot sparkles wait until pending CVar
+migrations finish, then use their unchanged settings; other features remain usable.
+Newer or invalid saved CVar versions block console changes rather than discarding
+unknown records.
 
 ## Spacer anchors
 
@@ -123,7 +118,8 @@ Enable switches, size, standalone position and corner choices are account-wide.
 EUI owns the anchor links. Disabling a spacer removes its links;
 detach dependent frames first if you want to preserve their placement.
 Re-enabling keeps saved geometry but requires recreating links. Change enable
-switches outside combat and after closing Unlock Mode.
+switches outside combat and after closing Unlock Mode. Pending changes also
+wait through combat-suspended Unlock Mode sessions until you finish editing.
 
 ### Player and Target corners
 
@@ -181,7 +177,10 @@ whisper windows remain local. Newly created tabs use native defaults.
 
 Unsupported message groups are skipped according to the running client's
 definitions. Application waits for combat to end and for chat/channels to be
-ready. City-only or password-protected channels may need a manual join.
+ready. A manual request retains the selected default while waiting for message
+definitions or chat frames; importing another default cancels that pending request.
+Missing API functions or insufficient tab capacity require an explicit retry after
+the cause is resolved. City-only or password-protected channels may need a manual join.
 Other joined channels are not left.
 
 Automatic updates select work once at login and preserve local edits when the
@@ -218,9 +217,9 @@ and [registration checklist](specs/macro-providers/TECH.md), starting from
 
 The **Compatibility** page controls bag/bank item-level scopes and
 WhatsTraining theme fix, with live status for each feature. Bag scope controls
-are disabled while bag item levels are off and retain your choices. On both
-General and Compatibility, bag controls are greyed out until EllesmereUIBags
-is loaded, and the training toggle is greyed out until WhatsTraining is loaded.
+are disabled while bag item levels are off and retain your choices. Bag controls
+are greyed out until EllesmereUIBags is loaded, and the training toggle is greyed
+out until WhatsTraining is loaded.
 Tooltips identify the required addon; saved preferences remain unchanged.
 The training tab inherits the native spellbook's backdrop and dim page artwork,
 so EUI and Modern skins keep their exact
@@ -247,6 +246,9 @@ only their changed labels, and unchanged fonts/layouts are cached. Available, ne
 unavailable and muted text retain
 WhatsTraining's status tones. Before the spellbook loads, text uses EUI's white
 default. Disabling the fix or spellbook skin restores owned visual changes.
+If restoration fails, status shows an error and the addon retains pending
+restoration records. After resolving the cause, turn the fix on and off to retry,
+or leave it off and reload the UI.
 
 Bag item levels use Blizzard's native item API and do not require SimpleItemLevel.
 Labels show equipment item levels in the top right; potential upgrade arrows
@@ -283,8 +285,12 @@ chat automation and spacers, and does not delete macros or rewrite EUI profiles.
 
 ## Development
 
-See [SPEC.md](SPEC.md) for the behavior contract, test commands and release
-checks. Mocked regression tests do not replace verification in WoW.
+Trust the project config with `mise trust`, then install its pinned tools with
+`mise install`. Run `mise run check` from Git Bash or WSL on Windows. See
+[SPEC.md](SPEC.md) for the behavior contract and release checks. Mocked regression
+tests do not replace verification in WoW. Before changing owned CVar definitions,
+follow the [migration contract](specs/cvar-migrations/PRODUCT.md) and
+[step-authoring guide](specs/cvar-migrations/TECH.md).
 
 The consolidated testing release is **0.2.0**. A future **1.0.0**
 will mark the first stable release. Download the installable ZIP from

@@ -89,6 +89,9 @@ Check(pluginRegistration.modules[1].key == "Tweaks", "Plugin module missing")
 Check(#pluginRegistration.modules[1].pages == 6, "Expected the six supported options pages")
 Check(type(ns.RegisterMacroProvider) == "function", "Shared macro registry missing")
 Check(ns.modules.chat == ns.Chat, "Chat preset module missing")
+Check(ns.modules.gatheringSparkles == nil and ns.defaults.gatheringSparkles == nil,
+    "Removed gathering feature must not load or expose settings")
+Check(ns.modules.questLootSparkles ~= nil, "Quest loot sparkles must remain available")
 
 -- WoW loads this addon's saved data immediately before ADDON_LOADED.
 CalmUITweaksDB = {mageMacro = {enabled = false}}

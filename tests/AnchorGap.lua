@@ -6,6 +6,7 @@ local function Check(value, message)
 end
 local function New(settings, anchors, lazy)
     local ns, frames, active, combat, timers = {}, {}, false, false, {}
+    local sessionActive = false
     local applied, propagated, errors = {}, {}, {}
     local env = setmetatable({}, {__index = _G})
     env._G = env
@@ -40,8 +41,9 @@ local function New(settings, anchors, lazy)
     function eui:RegisterUnlockModeListener(owner, callback)
         assert(owner == "CalmEUITweaks_AnchorGap")
         listener = callback
-        if active then callback(true) end
+        if sessionActive then callback(true) end
     end
+    function eui:UnregisterUnlockModeListener() listener = nil end
     function eui:IsUnlockModeActive() return active end
     eui.ReapplyUnlockAnchor = function(key) applied[#applied + 1] = key end
     eui.PropagateAnchorChain = function(key) propagated[#propagated + 1] = key end
@@ -60,8 +62,10 @@ local function New(settings, anchors, lazy)
     ns.CallModule("anchorGap", "ApplySettings")
     local s = {ns = ns, env = env, db = env.EllesmereUIDB, eui = eui, applied = applied,
         propagated = propagated, errors = errors, driver = frames[1]}
-    function s:open() active = true; if listener then listener(true) end end
-    function s:close() active = false; if listener then listener(false) end end
+    function s:open() active, sessionActive = true, true; if listener then listener(true) end end
+    function s:close() active, sessionActive = false, false; if listener then listener(false) end end
+    function s:suspend() assert(sessionActive); active = false end
+    function s:resume() assert(sessionActive); active = true end
     function s:place(key)
             local element = eui._unlockRegisteredElements[key]
             if not element then
@@ -214,6 +218,30 @@ local lazy = New({enabled = true}, nil, true)
 lazy:loadEngine(); lazy:open()
 lazy.db.unlockAnchors.bar = Link("TOP"); lazy:tick()
 Check(lazy.db.unlockAnchors.bar.offsetY == 1.5, "Listener is installed before EUI's full anchor engine loads")
+
+local suspended = New({enabled = true})
+suspended:open(); suspended:combat(true); suspended:suspend()
+suspended.ns.CallModule("anchorGap", "OnAddonLoaded", "EllesmereUIBags")
+suspended.db.unlockAnchors.during = Link("TOP")
+suspended:tick()
+Check(suspended.db.unlockAnchors.during.offsetY == nil, "Suspended sessions cannot mutate anchors in combat")
+suspended:combat(false); suspended:resume(); suspended:tick()
+Check(suspended.db.unlockAnchors.during.offsetY == 1.5,
+    "Lifecycle refresh during suspension preserves session observation through resume")
+suspended.db.unlockAnchors.after = Link("TOP"); suspended:tick()
+Check(suspended.db.unlockAnchors.after.offsetY == 1.5, "Fresh links receive gaps after resumed editing")
+suspended:close()
+suspended.db.unlockAnchors.closed = Link("TOP"); suspended:tick()
+Check(suspended.db.unlockAnchors.closed.offsetY == nil and not next(suspended.driver.events),
+    "Real close releases observation and idle event subscriptions")
+
+local lateSession = New()
+lateSession:open(); lateSession:combat(true); lateSession:suspend()
+lateSession.ns.SetSetting("anchorGap", "enabled", true)
+lateSession:combat(false); lateSession:resume()
+lateSession.db.unlockAnchors.fresh = Link("TOP"); lateSession:tick()
+Check(lateSession.db.unlockAnchors.fresh.offsetY == 1.5,
+    "Enabling during suspension retains the immediate session-open notification")
 
 local replace = New({enabled = true})
 replace:open()

@@ -10,7 +10,7 @@ local roots = {
 }
 local function WeakKeys() return setmetatable({}, {__mode = "k"}) end
 local buttons, frames, parents, nativeHooks, ownedOverlays = WeakKeys(), WeakKeys(), WeakKeys(), WeakKeys(), WeakKeys()
-local events = { "BAG_UPDATE_DELAYED", "PLAYER_REGEN_DISABLED", "PLAYER_EQUIPMENT_CHANGED" }
+local events = { "BAG_UPDATE_DELAYED", "PLAYER_REGEN_DISABLED", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP" }
 local bankEvents = { "PLAYERBANKSLOTS_CHANGED", "PLAYERREAGENTBANKSLOTS_CHANGED",
     "BANK_TABS_CHANGED", "BANK_TAB_SETTINGS_UPDATED", "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED" }
 local generation, enabled, scheduled, deferred = 0, false, false, false
@@ -546,6 +546,8 @@ end
 UpdateEvents = function()
     if not eventFrame then return end
     local desired = NeededEvents()
+    -- Once completion listeners stop, requests may finish unseen; reopening must retry.
+    if not desired.ITEM_DATA_LOAD_RESULT then pendingItems = {} end
     for event in pairs(eventMask) do
         if not desired[event] then
             eventFrame:UnregisterEvent(event)
@@ -573,7 +575,7 @@ function Module:Initialize()
         for slot, level in pairs(equipped) do
             if level == false then equipped[slot] = nil end
         end
-        if event == "PLAYER_EQUIPMENT_CHANGED" then
+        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_LEVEL_UP" then
             equipped = {}
             for button in pairs(buttons) do Clear(button) end
         end

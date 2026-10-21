@@ -133,12 +133,13 @@ function module:ApplySettings()
     end
     if listenerHost ~= eui then
         listenerHost = eui
+        session = false
         eui:RegisterUnlockModeListener(addonName .. "_AnchorGap", function(active)
             session = active == true
             UpdateObserver()
         end)
     end
-    session = eui:IsUnlockModeActive()
+    -- Combat hides the editor without closing the listener-owned edit session.
     if not UpdateObserver() then return end
     local settings = ns.GetSettings("anchorGap")
     ns.SetStatus("anchorGap", settings.enabled and string.format(
