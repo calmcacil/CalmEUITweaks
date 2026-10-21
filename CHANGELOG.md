@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.6.1...v0.7.0) (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **storage:** Pending or unsupported SavedVariables schemas now pause addon startup and reject settings edits/reset instead of allowing features to use partially upgraded data.
+
+### Features
+
+* **storage:** migrate SavedVariables before feature startup ([#31](https://github.com/calmcacil/CalmEUITweaks/issues/31)) ([160384d](https://github.com/calmcacil/CalmEUITweaks/commit/160384d60c1189c91ae2ef50b13ecd968a3189d3))
+
 ## [0.6.1](https://github.com/calmcacil/CalmEUITweaks/compare/v0.6.0...v0.6.1) (2026-10-21)
 
 
