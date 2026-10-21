@@ -90,7 +90,9 @@ Ore/herb sparkles have been removed. On upgrade, the addon restores targeting
 settings recorded by the old feature only when they still match its last writes;
 subsequent changes by you or another addon are preserved. Cleanup waits through
 combat or unavailable APIs, keeps unfinished records across reloads, and removes
-the obsolete settings when complete. `/calmtweaks status` reports cleanup errors
+the obsolete settings when complete. A completed upgrade prints one chat line such
+as `savedvarsdb updated from "0" to "1"`; fresh installs and already-current
+accounts stay silent. `/calmtweaks status` reports cleanup errors
 or pending work. The account-wide `cvarVersion` records completed cleanup steps
 and survives preference resets. Quest loot sparkles wait until pending CVar
 migrations finish, then use their unchanged settings; other features remain usable.

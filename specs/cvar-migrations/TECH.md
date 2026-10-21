@@ -56,10 +56,12 @@ This is an internal definition list, not a new module or callback registry.
 6. On success, remove a retired subtree and persist that step's number. Prepare
    and execute the next step. Resolve the active settings subtree from `ns.db`
    on each attempt: reset replaces tables and must not resurrect stale preferences.
-7. Once every step completes, release migration subscriptions and request quest
-   settings application through existing coalescing. Notify only on advancement
-   to readiness, not on every later application. A duplicate idempotent startup
-   application is acceptable; an extra scheduler to avoid it is not.
+7. Once every step completes, print one chat notice from the starting version to
+   the final version when the account had saved data or a prior checkpoint, then
+   release migration subscriptions and request quest settings application through
+   existing coalescing. Suppress the notice for fresh installs. Notify only on
+   advancement to readiness, not on every later application. A duplicate
+   idempotent startup application is acceptable; an extra scheduler to avoid it is not.
 
 No additional persisted in-progress flag is necessary. The checkpoint plus each
 ledger describes unfinished work. Completed restore records cannot be reacquired

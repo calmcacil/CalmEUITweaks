@@ -19,7 +19,7 @@ ns.cvarMigrations = {
         },
     },
 }
-local events, watched
+local events, watched, legacyPresent
 
 local function Version()
     local version = ns.db.cvarVersion
@@ -69,6 +69,9 @@ function module:Initialize()
     local version, reason = Version()
     if not version then ns.SetStatus("legacyCVars", reason); return end
     if version < #ns.cvarMigrations then
+        local step = ns.cvarMigrations[version + 1]
+        -- Fresh installs have no saved subtree; upgrades normally do.
+        legacyPresent = ns.db[step.settingsKey] ~= nil
         local _, settings = Prepare(version)
         if next(settings.restore) then CreateDriver() end
     end
@@ -78,6 +81,7 @@ function module:ApplySettings()
     if events then events:UnregisterAllEvents() end
     local version, reason = Version()
     if not version then ns.SetStatus("legacyCVars", reason); return end
+    local startVersion = version
     local advanced = false
     while version < #ns.cvarMigrations do
         -- Reset replaces active settings tables; always use the latest preferences.
@@ -102,5 +106,11 @@ function module:ApplySettings()
         advanced = true
     end
     ns.SetStatus("legacyCVars", "CVar migrations complete (version " .. version .. ").")
-    if advanced then ns.RequestApply("questLootSparkles") end
+    if advanced then
+        if startVersion > 0 or legacyPresent then
+            ns.Print(string.format('savedvarsdb updated from "%d" to "%d"', startVersion, version))
+        end
+        legacyPresent = false
+        ns.RequestApply("questLootSparkles")
+    end
 end

@@ -26,14 +26,15 @@ local function Saved()
 end
 local function New(saved, current, options)
     options = options or {}
-    local ns, frames, timers, writes = {}, {}, {}, {}
+    local ns, frames, timers, writes, messages = {}, {}, {}, {}, {}
     local env = setmetatable({}, {__index = _G})
     env._G, env.CalmUITweaksDB = env, saved or {}
-    env.print = function() end
+    env.print = function(message) messages[#messages + 1] = message end
     env.geterrorhandler = function() return function() end end
     env.IsLoggedIn = function() return false end
     local s = {ns = ns, cv = current or Copy(applied), combat = options.combat, reject = options.reject,
-        throw = options.throw, silent = options.silent, frames = frames, writes = writes, env = env}
+        throw = options.throw, silent = options.silent, frames = frames, writes = writes, messages = messages,
+        env = env}
     env.InCombatLockdown = function() return s.combat == true end
     env.CreateFrame = function()
         local frame = {events = {}, scripts = {}}
@@ -103,13 +104,23 @@ Check(fresh.ns.defaults.gatheringSparkles == nil and fresh.ns.db.gatheringSparkl
 Check(fresh.ns.modules.gatheringSparkles == nil, "Removed gameplay module must not register")
 Check(not fresh.ns.SetSetting("gatheringSparkles", "enabled", true), "Removed preference cannot be enabled")
 Check(#fresh.writes == 0 and not fresh.driver, "Fresh installs create no cleanup frame or writes")
+Check(#fresh.messages == 0, "Fresh installs do not announce a saved-data upgrade")
 
 local upgraded = New(Saved())
 for name, value in pairs(original) do Check(upgraded.cv[name] == value, "Restore still-owned " .. name) end
 Check(upgraded.ns.db.gatheringSparkles == nil, "Completed migration deletes obsolete settings")
 Check(not next(upgraded.driver.events), "Completed migration releases all subscriptions")
+Check(#upgraded.messages == 1 and upgraded.messages[1]:find('savedvarsdb updated from "0" to "1"', 1, true),
+    "Completed upgrade announces the saved-data version change once")
 upgraded:fire("PLAYER_ENTERING_WORLD"); upgraded:flush()
-Check(#upgraded.writes == 8, "Completed cleanup never replays")
+Check(#upgraded.writes == 8 and #upgraded.messages == 1, "Completed cleanup never replays or re-announces")
+
+local reloadedVersion = New({cvarVersion = 1})
+Check(#reloadedVersion.messages == 0, "Already-current saved data must not announce on every login")
+
+local emptyUpgrade = New({gatheringSparkles = {enabled = false, restore = {}}})
+Check(#emptyUpgrade.messages == 1 and emptyUpgrade.messages[1]:find('"0" to "1"', 1, true),
+    "Upgrading existing saved data announces even when there is nothing to restore")
 
 local saved, current = Saved(), Copy(applied)
 current.SoftTargetInteractRange = "8"
