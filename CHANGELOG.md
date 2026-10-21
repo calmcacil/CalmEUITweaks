@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.7.0...v0.8.0) (2026-10-21)
+
+
+### Features
+
+* **cursor:** add washed-out cursor fix toggle ([#33](https://github.com/calmcacil/CalmEUITweaks/issues/33)) ([7ddf2f7](https://github.com/calmcacil/CalmEUITweaks/commit/7ddf2f71a2119678bb4bff1aa78e4b2c1c1f3421))
+
 ## [0.7.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.6.1...v0.7.0) (2026-10-21)
 
 
