@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/calmcacil/CalmEUITweaks/compare/v0.6.0...v0.6.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **cvar:** announce saved-data upgrades in chat ([#29](https://github.com/calmcacil/CalmEUITweaks/issues/29)) ([12da453](https://github.com/calmcacil/CalmEUITweaks/commit/12da45393fe37b2faf2aeb14116950ee8981df30))
+
 ## [0.6.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.5.0...v0.6.0) (2026-10-21)
 
 
