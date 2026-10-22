@@ -28,7 +28,7 @@ Use `/calmtweaks status` to check dependencies and errors.
 | Mage macro | Off | Maintains a character macro using supported known food/water ranks. |
 | Druid macros | Off | Maintains character macros for Rebirth/Revive and self-cast Thorns. |
 | General macro | Off | Maintains an account-wide food/water macro from the highest conjured items in your bags. |
-| Bag upgrade arrows | Enabled for all scopes | Adds upgrade arrows in EUI inventory, reagent bags and bank; EUI keeps showing native item levels. |
+| Bag upgrade arrows | Off; all three scopes off | Adds upgrade arrows in EUI inventory, reagent bags and bank; EUI keeps showing native item levels. |
 | Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
 | LFG leader location | Off | Shows the leader's current zone beside each LFG activity. |
 | Cursor washed-out fix | Off | Disables the hardware cursor to work around washed-out cursor colors. |
@@ -95,29 +95,30 @@ another addon; values already configured for sparkles are left as found.
 
 ## Saved-data upgrades
 
-Ore/herb sparkles have been removed. On upgrade, the addon restores targeting
-settings recorded by the old feature only when they still match its last writes;
-subsequent changes by you or another addon are preserved. Cleanup waits through
-combat or unavailable APIs, keeps unfinished records across reloads, and removes
-the obsolete settings when complete. The account-wide `schemaVersion` now tracks
-all saved-data migrations. Existing 0.6.x `cvarVersion = 1` data adopts that completed
-cleanup and upgrades to schema 4 without replaying it. Step 3 adds the cursor fix
-preference, defaulting off without changing the native cursor. Step 4 is the 1.0
-cleanup: it removes recognized retired account roots such as gathering sparkles,
-What's Training, anchor gaps and corner alignment, while keeping live
-preferences. Unrecognized keys are preserved so macro providers and future
-settings are not lost. Initialization also removes retired character roots after
-the one-time spacer import. After login, an existing account gets one notice
-such as
-`savedvarsdb updated from "3" to "4"`; fresh and already-current accounts stay
-silent.
+The 1.0 candidate starts the **Calm Forever v1** saved-data lineage. First load
+converts pre-1.0 accounts once: every known preference returns to its default,
+including macro names, and every switch is off, including all three bag scopes.
+Actual macros, account/character macro ownership, saved chat default and apply
+records, spacer geometry, and unknown fields in live settings are preserved.
+Recognized retired feature roots and invalid CVar ledger entries are exceptions.
+After conversion, your new choices survive reload and character switches.
 
-`/calmtweaks status` reports upgrade progress or errors. Features and options
-editing wait until the saved schema is ready, so nothing uses partially upgraded
-data. Unsupported account or character versions are preserved rather than reset.
-Do not manually raise the version to bypass cleanup. Back up SavedVariables before
-upgrading or downgrading; older releases that do not understand the new schema
-cannot enforce its downgrade protection.
+An absent `calm_forever` marker selects historical schema 0..4/CVar 0..1 cleanup,
+not the new schema 1. Completed targeting cleanup is not replayed. Before the
+conversion commits `calm_forever = true` and `schemaVersion = 1` together, it
+restores still-owned targeting, full quest graphics and cursor CVars from valid
+records. Later external writes remain untouched. Cleanup waits for login, the
+end of combat and available APIs; unresolved records survive reloads. Later
+characters import old spacer geometry only into missing account layouts.
+
+Existing nonempty accounts receive one post-login notice naming Calm Forever v1
+and explaining the preference reset. Fresh and already-current accounts stay
+silent. `/calmtweaks status` explains pending or blocked work; options remain
+visible but editing, reset and feature startup wait for completion. Malformed or
+unsupported account/character data is preserved and blocks startup before either
+store is changed. Do not edit the marker or relabel old versions to bypass cleanup.
+Back up SavedVariables before conversion or downgrading: older releases do not
+understand this marker and cannot provide downgrade safety.
 
 ## Spacer anchors
 
@@ -178,8 +179,8 @@ supported; save a fresh default for older export formats.
 ## Macros and bag upgrade arrows
 
 Open **Macro** to configure generated macros. Sections are General first, then
-Druid and Mage. Fresh installs start with every macro off; existing enabled
-choices are preserved. Each macro pairs its
+Druid and Mage. Fresh installs, lineage conversion and normal reset leave every
+macro off. Marked v1 reloads preserve enabled choices. Each macro pairs its
 maintenance toggle with a **Rename** button. Macro names are account-wide.
 Enabling a provider adopts the only same-name macro in its scope and updates its
 body. Duplicate names or a same-name macro in the other scope still need a free
@@ -187,14 +188,17 @@ name. Renaming does not delete earlier macros. Editing an owned macro suspends
 maintenance, and disabling a feature does not delete its macro.
 
 The default names are **Food and Water** (general), **Rebirth**, **Thorns**, and
-**FoodWater** (mage). Existing saved names are left unchanged.
+**FoodWater** (mage). Conversion/reset restores these name preferences without
+renaming existing macros. Rename accepts 1-16 bytes of plain text, not 16 Unicode
+characters; control characters and `|` are rejected.
 
-**General food and water** is one account-wide macro available to every class.
-Left-click eats the highest-rank conjured food in your bags; right-click drinks
-the highest-rank conjured water. It updates when bag contents change. Bank
-contents do not count, and the last active character's bags decide the current
-item ranks. If either food or water is missing, an existing macro is left
-unchanged.
+**General food macro** creates one account-wide macro for every class, even with
+empty bags. With no conjured items it contains only `#showtooltip`; newly created
+placeholders use the mage class icon. Food adds a left-click eat action, water
+adds a right-click drink action, and each selects its highest available rank.
+Bag changes add or remove the corresponding actions and update the tooltip/icon.
+Manually chosen and adopted macro icons are preserved. Bank contents do not count;
+the last active character's bags determine this account-wide macro.
 
 The druid **Rebirth** macro casts Rebirth in combat and Revive out of combat.
 Both spells must be learned. The druid **Thorns** macro casts Thorns on yourself.
@@ -239,22 +243,25 @@ ends.
 /calmtweaks                         Open settings
 /calmtweaks status                  Report feature and dependency status
 /calmtweaks macro-name <name>       Set the mage macro name preference
-/calmtweaks reset                   Show reset instructions
-/calmtweaks reset confirm           Reset addon preferences
+/calmtweaks reset                   Confirm preference reset and UI reload
 ```
 
 Preferences, general-macro ownership, the chat default and spacer geometry use
 `CalmUITweaksDB`. Character-macro ownership and chat apply records use
 `CalmUITweaksCharDB`. These are normal WoW SavedVariables, separate from EUI
-profiles. Schema version 4 removes recognized retired feature roots while
-keeping live preferences and unrecognized keys. Existing character spacer
-geometry seeds missing account layouts on first load; later characters cannot
-replace established account layouts, and retired character roots are removed
-after that import.
-Reset preserves the schema checkpoint, saved chat default, spacer geometry and
-character records, disables chat automation and spacers, and does not delete
-macros or rewrite EUI profiles. Reset and setting changes are rejected while an
-upgrade is pending or blocked; the status reason explains why.
+profiles. Existing character spacer geometry seeds missing account layouts on
+that character's first compatible load; established account layouts win. Retired
+character spacer roots are removed after import, not on behalf of offline characters.
+
+Normal reset changes only known preference leaves, including names and all
+switches. It preserves lineage/checkpoint metadata, unknown live nested/provider
+fields, macro ownership, chat default/receipts, geometry and character records.
+It restores still-owned active CVars without deleting macros, changing chat
+history or rewriting EUI profiles. Reset and setting changes are rejected while
+an upgrade is pending or blocked; the status reason explains why. The slash
+command opens an EUI confirmation popup; Cancel changes nothing, while Reset and
+Reload resets preferences then reloads the UI. Finish combat and Unlock Mode
+before resetting. Readiness is checked again when you confirm.
 
 ## Development
 
@@ -266,8 +273,10 @@ tests do not replace verification in WoW. Before changing saved data, follow the
 [schema step-authoring guide](specs/saved-variables/TECH.md). Native console changes
 also follow the [CVar cleanup guide](specs/cvar-migrations/TECH.md).
 
-The consolidated testing release is **0.2.0**. A future **1.0.0**
-will mark the first stable release. Download the installable ZIP from
+Main's version metadata is **0.8.0** while the **1.0.0 candidate** is prepared
+for user testing. It is not publication approval. Complete the in-game checklist
+in [SPEC.md](SPEC.md) before requesting release approval; do not hand-edit versions.
+Download published installable ZIPs from
 [GitHub Releases](https://github.com/calmcacil/CalmEUITweaks/releases).
 See [CI and releases](docs/CI_RELEASES.md) for automated checks, versioning,
 release App setup, and recovery.

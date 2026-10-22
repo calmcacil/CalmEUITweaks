@@ -1,5 +1,8 @@
 -- Run from the EUI root: lua CalmEUITweaks/tests/ProviderMacros.lua
 local passed = 0
+local MAGE_ICON = "Interface\\Icons\\ClassIcon_Mage"
+local AUTO_ICON = "INV_Misc_QuestionMark"
+local ICON_IDS = { [MAGE_ICON] = 626000, [AUTO_ICON] = 134400 }
 
 local function Check(value, message)
     assert(value, message)
@@ -16,7 +19,7 @@ local function New(options)
     options = options or {}
     local state = {
         macros = {}, timers = {}, frames = {}, known = {}, names = {}, bags = {},
-        writes = 0, combat = false, class = options.class or "DRUID",
+        writes = 0, edits = {}, combat = false, class = options.class or "DRUID",
         level = options.level or 60,
     }
     local settings = {
@@ -66,7 +69,7 @@ local function New(options)
 
     GetMacroInfo = function(index)
         local macro = state.macros[index]
-        if macro then return macro.name, "icon", macro.body end
+        if macro then return macro.name, macro.icon, macro.body end
     end
     GetNumMacros = function()
         local account, character = 0, 0
@@ -87,16 +90,28 @@ local function New(options)
             while state.macros[index] do index = index + 1 end
             assert(index <= 120, "Creation exceeded account capacity")
         end
-        state.macros[index] = { name = name, body = body, character = character }
+        assert(character == true or character == nil, "Account scope must use a nil flag")
+        state.macros[index] = {
+            name = name, body = body, character = character,
+            icon = options.stringIcons and icon or ICON_IDS[icon] or icon,
+        }
         state.writes = state.writes + 1
+        state:Event("UPDATE_MACROS")
         return index
     end
     EditMacro = function(index, name, icon, body)
         assert(not state.combat, "Edit attempted in combat")
-        assert(name == nil and icon == nil, "Owned edits must preserve macro name and icon")
+        assert(name == nil, "Owned edits must preserve macro name")
+        if index > 120 then assert(icon == nil, "Other providers must preserve icons") end
         assert(index >= 1 and index <= 138, "Edit index is outside the macro slots")
+        state.edits[#state.edits + 1] = { icon = icon, body = body }
         state.macros[index].body = body
+        if icon and not state.ignoreIcon then
+            state.macros[index].icon = options.stringIcons and icon or ICON_IDS[icon] or icon
+        end
         state.writes = state.writes + 1
+        if state.afterEdit then state.afterEdit(state.macros[index]) end
+        state:Event("UPDATE_MACROS")
         return index
     end
 
@@ -212,73 +227,221 @@ Check(s.writes == 0 and #s.frames == 0 and module:GetStatus():find("Druid only",
     "Druid macros stay inert for other classes")
 
 s, settings, ns, providers = New({ class = "WARRIOR" })
-s:Item(0, 1, 5349); s:Item(0, 2, 5350)
-body = providers.foodWater.Build()
-Check(body == table.concat({
+module = ns.modules.generalFoodWaterMacro
+module:Initialize(); s:Flush()
+Check(s.writes == 1 and s.macros[1] and s.macros[1].body == "#showtooltip",
+    "Enabled general provider creates an account macro even with empty bags")
+local record = ns.db.generalFoodWaterMacro.ownedMacros["Food and Water"]
+Check(s.macros[1].character == nil and ns.charDB.generalFoodWaterMacro == nil
+    and record.lastGeneratedBody == "#showtooltip", "General ownership is account scope")
+Check(s.macros[1].icon == ICON_IDS[MAGE_ICON] and record.lastGeneratedIconKey == MAGE_ICON
+    and record.lastGeneratedIcon == ICON_IDS[MAGE_ICON],
+    "Empty creation records the requested mage texture and actual numeric readback")
+Check(s.frames[1].events.BAG_UPDATE_DELAYED, "General provider subscribes to bag changes")
+s:Event("BAG_UPDATE_DELAYED"); s:Event("UPDATE_MACROS"); s:Flush()
+Check(s.writes == 1, "Unchanged empty bags and native macro notifications do not write")
+
+s:Item(0, 1, 5349)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 2 and s.macros[1].body == "#showtooltip item:5349\n/use [btn:1] item:5349",
+    "Empty to food-only adds only the left-click food action")
+Check(s.edits[1].icon == AUTO_ICON and s.macros[1].icon == ICON_IDS[AUTO_ICON]
+    and record.lastGeneratedIconKey == AUTO_ICON and record.lastGeneratedIcon == ICON_IDS[AUTO_ICON],
+    "Available food switches to the native automatic icon and records its actual ID")
+s:Item(0, 2, 5350)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 3 and s.macros[1].body == table.concat({
     "#showtooltip [btn:2] item:5350; item:5349",
     "/use [btn:1] item:5349",
     "/use [btn:2] item:5350",
-}, "\n"), "General food and water uses bag items")
+}, "\n"), "Food-only to both preserves the existing full macro body")
+Check(s.edits[2].icon == nil, "An unchanged requested icon is not rewritten")
+s:Item(0, 1, nil)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 4 and s.macros[1].body == "#showtooltip item:5350\n/use [btn:2] item:5350",
+    "Both to water-only removes the unavailable food action")
+s:Item(0, 2, nil)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 5 and s.macros[1].body == "#showtooltip" and s.edits[4].icon == MAGE_ICON
+    and s.macros[1].icon == ICON_IDS[MAGE_ICON], "Water-only to empty removes stale actions and restores mage icon")
 
-s:Item(0, 1, 22895); s:Item(0, 2, 8079)
-body = providers.foodWater.Build()
-Check(body:find("item:22895", 1, true) and body:find("item:8079", 1, true)
-    and not body:find("item:5349", 1, true), "Highest food and water tiers win independently")
-
-s.bags[0][1] = nil; s.bags[0][2] = nil
-body, message = providers.foodWater.Build()
-Check(body == nil and message:find("conjured food and water", 1, true),
-    "Missing bag items reports a useful status")
-
-s, settings, ns, providers = New({ class = "WARRIOR" })
-s:Item(0, 1, 5349); s:Item(0, 2, 5350)
+local savedMacros, savedRecords = s.macros, settings.generalFoodWaterMacro.ownedMacros
+s, settings, ns, providers = New({ class = "ROGUE", level = 1 })
+s.macros, settings.generalFoodWaterMacro.ownedMacros = savedMacros, savedRecords
 module = ns.modules.generalFoodWaterMacro
 module:Initialize(); s:Flush()
-Check(s.writes == 1 and not s.macros[1].character
-    and s.macros[1].body:find("item:5349", 1, true),
-    "General food and water creates an account macro")
-Check(ns.db.generalFoodWaterMacro.ownedMacros["Food and Water"].lastGeneratedBody == s.macros[1].body,
-    "General ownership is account scope")
-Check(s.frames[1].events.BAG_UPDATE_DELAYED, "General provider subscribes to bag changes")
-
-s:Item(0, 1, 22895); s:Item(0, 2, 8079)
+Check(s.writes == 0, "Reload recognizes saved numeric icon readback without writing")
+s:Item(0, 1, 5349); s:Item(0, 2, 5350)
+s:Item(4, 1, 22895); s:Item(4, 2, 8079)
+s:Item(-1, 1, 8076)
 s:Event("BAG_UPDATE_DELAYED"); s:Flush()
-Check(s.writes == 2 and s.macros[1].body:find("item:22895", 1, true)
-    and s.macros[1].body:find("item:8079", 1, true), "Bag changes update the account macro")
-
-s.macros[1].body = "/say mine"
+Check(s.writes == 1 and s.macros[1].body:find("item:22895", 1, true)
+    and s.macros[1].body:find("item:8079", 1, true) and not s.macros[1].body:find("item:5349", 1, true),
+    "Strongest owned ranks win across bags independently of class, level and known spells")
+Check(s.edits[1].icon == AUTO_ICON, "Reload retains icon ownership across key transitions")
+s:Item(4, 1, nil)
 s:Event("BAG_UPDATE_DELAYED"); s:Flush()
-Check(s.writes == 2 and module:GetStatus():find("User-edited", 1, true),
-    "Manual general macro edits are preserved")
+Check(s.macros[1].body:find("item:5349", 1, true) and s.macros[1].body:find("item:8079", 1, true),
+    "Food and water ranks downgrade independently and bank items are ignored")
+s:Event("BAG_UPDATE_DELAYED"); s:Event("UPDATE_MACROS"); s:Flush()
+Check(s.writes == 2, "Unchanged available items do not write")
+
+record = settings.generalFoodWaterMacro.ownedMacros["Food and Water"]
+s.macros[1].body, s.macros[1].icon = "/say mine", "manual body icon"
+s.bags = {}
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 2 and s.macros[1].body == "/say mine" and s.macros[1].icon == "manual body icon"
+    and record.lastGeneratedIconKey == AUTO_ICON and module:GetStatus():find("User-edited", 1, true),
+    "Manual body edit stops all maintenance before changing icon ownership")
 
 s, settings, ns, providers = New({ class = "WARRIOR" })
-s:Item(0, 1, 5349); s:Item(0, 2, 5350)
-s.macros[1] = { name = "Food and Water", body = "/say existing" }
 module = ns.modules.generalFoodWaterMacro
 module:Initialize(); s:Flush()
-Check(s.writes == 1 and not s.macros[1].character
-    and s.macros[1].body == providers.foodWater.Build()
-    and ns.db.generalFoodWaterMacro.ownedMacros["Food and Water"].lastGeneratedBody == s.macros[1].body
-    and module:GetStatus():find("Adopted", 1, true), "Unowned general macro is adopted")
+record = settings.generalFoodWaterMacro.ownedMacros["Food and Water"]
+s.macros[1].icon = "manual icon"
+s:Event("UPDATE_MACROS"); s:Flush()
+Check(s.writes == 1 and record.lastGeneratedIconKey == nil and record.lastGeneratedIcon == nil,
+    "Manual icon edit relinquishes icon ownership even with an unchanged body")
+s:Item(0, 1, 5349)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+s.bags = {}
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 3 and s.macros[1].body == "#showtooltip" and s.macros[1].icon == "manual icon"
+    and s.edits[1].icon == nil and s.edits[2].icon == nil,
+    "Body maintenance continues without overriding a manually customized icon")
+
+for _, existingBody in ipairs({ "/say existing", "#showtooltip" }) do
+    s, settings, ns, providers = New({ class = "WARRIOR" })
+    s.macros[1] = { name = "Food and Water", body = existingBody, icon = "adopted icon" }
+    module = ns.modules.generalFoodWaterMacro
+    module:Initialize(); s:Flush()
+    record = settings.generalFoodWaterMacro.ownedMacros["Food and Water"]
+    Check(s.writes == (existingBody == "#showtooltip" and 0 or 1)
+        and s.macros[1].body == "#showtooltip" and s.macros[1].icon == "adopted icon"
+        and record.lastGeneratedBody == "#showtooltip" and record.lastGeneratedIconKey == nil,
+        "Adoption preserves an untracked icon with or without a body write")
+    s:Item(0, 1, 5349)
+    s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+    s.bags = {}
+    s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+    Check(s.macros[1].body == "#showtooltip" and s.macros[1].icon == "adopted icon"
+        and record.lastGeneratedIcon == nil, "Adopted icons remain unowned across item transitions")
+    for _, edit in ipairs(s.edits) do Check(edit.icon == nil, "Adoption never writes an icon") end
+end
+
+s, settings, ns, providers = New()
+s.macros[1] = { name = "Food and Water", body = "#showtooltip", icon = ICON_IDS[MAGE_ICON] }
+settings.generalFoodWaterMacro.ownedMacros = { ["Food and Water"] = { lastGeneratedBody = "#showtooltip" } }
+module = ns.modules.generalFoodWaterMacro
+module:Initialize(); s:Flush()
+s:Item(0, 1, 5349)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 1 and s.edits[1].icon == nil and s.macros[1].icon == ICON_IDS[MAGE_ICON],
+    "Existing body-only ownership never acquires icon ownership even for a matching native icon")
+
+for _, indices in ipairs({ { 121 }, { 1, 2 }, { 1, 121 } }) do
+    s, settings, ns, providers = New()
+    for _, index in ipairs(indices) do
+        s.macros[index] = { name = "Food and Water", body = "/say collision", icon = "foreign" }
+    end
+    module = ns.modules.generalFoodWaterMacro
+    module:Initialize(); s:Flush()
+    Check(s.writes == 0 and not settings.generalFoodWaterMacro.ownedMacros
+        and module:GetStatus():find("Name conflict", 1, true), "Empty bags retain cross-scope and duplicate-name protection")
+end
 
 s, settings, ns, providers = New({ class = "WARRIOR" })
-s:Item(0, 1, 5349); s:Item(0, 2, 5350)
 module = ns.modules.generalFoodWaterMacro
 module:Initialize(); s:Flush()
 s.combat = true
-s:Item(0, 1, 22895)
+s:Item(0, 1, 5349)
 s:Event("BAG_UPDATE_DELAYED"); s:Flush()
-Check(s.writes == 1 and module:GetStatus():find("combat", 1, true),
-    "Bag updates defer during combat")
+Check(s.writes == 1 and s.macros[1].body == "#showtooltip" and s.frames[1].events.PLAYER_REGEN_ENABLED,
+    "Food arrival and icon changes defer during combat")
 s.combat = false
 s:Event("PLAYER_REGEN_ENABLED"); s:Flush()
-Check(s.writes == 2 and s.macros[1].body:find("item:22895", 1, true),
-    "Combat end applies the deferred bag update")
+Check(s.writes == 2 and s.macros[1].icon == ICON_IDS[AUTO_ICON]
+    and s.macros[1].body:find("item:5349", 1, true), "Combat end applies the deferred food and icon update")
+s.combat = true; s.bags = {}
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+s.combat = false
+s:Event("PLAYER_REGEN_ENABLED"); s:Flush()
+Check(s.writes == 3 and s.macros[1].body == "#showtooltip" and s.macros[1].icon == ICON_IDS[MAGE_ICON],
+    "Losing items in combat removes stale actions and restores icon after combat")
+settings.generalFoodWaterMacro.enabled = false; module:ApplySettings()
+s:Item(0, 1, 5349)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 3 and next(s.frames[1].events) == nil, "Disabling releases events and preserves the existing macro")
 
-s, settings, ns, providers = New({ generalEnabled = false, class = "WARRIOR" })
-s:Item(0, 1, 5349); s:Item(0, 2, 5350)
+s, settings, ns, providers = New({ generalEnabled = false })
 module = ns.modules.generalFoodWaterMacro
 module:Initialize(); s:Flush()
-Check(s.writes == 0 and #s.frames == 0, "Disabled general provider stays inert")
+Check(s.writes == 0 and #s.frames == 0, "Disabled general provider stays inert with empty bags")
+
+s, settings, ns, providers = New({ class = "WARRIOR" })
+s:Item(0, 1, 5350); s.combat = true
+module = ns.modules.generalFoodWaterMacro
+module:Initialize(); s:Flush()
+Check(s.writes == 0 and s.frames[1].events.PLAYER_REGEN_ENABLED,
+    "Initial creation also waits for combat to end")
+s.combat = false; s:Event("PLAYER_REGEN_ENABLED"); s:Flush()
+record = settings.generalFoodWaterMacro.ownedMacros["Food and Water"]
+Check(s.writes == 1 and s.macros[1].body == "#showtooltip item:5350\n/use [btn:2] item:5350"
+    and s.macros[1].icon == ICON_IDS[AUTO_ICON] and record.lastGeneratedIconKey == AUTO_ICON,
+    "Creation with water uses only right-click and records the automatic icon")
+s.bags = {}; s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 2 and s.macros[1].icon == ICON_IDS[MAGE_ICON],
+    "A macro first created with available items can restore its empty fallback")
+
+s, settings, ns, providers = New({ stringIcons = true })
+module = ns.modules.generalFoodWaterMacro
+module:Initialize(); s:Flush()
+s:Item(0, 1, 5349)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+s.bags = {}; s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 3 and s.macros[1].icon == MAGE_ICON
+    and settings.generalFoodWaterMacro.ownedMacros["Food and Water"].lastGeneratedIcon == MAGE_ICON,
+    "String icon readbacks are supported without numeric normalization")
+
+s, settings, ns, providers = New()
+module = ns.modules.generalFoodWaterMacro
+module:Initialize(); s:Flush()
+record = settings.generalFoodWaterMacro.ownedMacros["Food and Water"]
+local build = providers.foodWater.Build
+providers.foodWater.Build = function() return "#showtooltip", nil, nil, AUTO_ICON end
+s.ignoreIcon = true
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 2 and record.lastGeneratedBody == "#showtooltip"
+    and record.lastGeneratedIconKey == MAGE_ICON and record.lastGeneratedIcon == ICON_IDS[MAGE_ICON],
+    "Failed icon-only edit readback does not advance body or icon ownership or loop on UPDATE_MACROS")
+Check(module:GetStatus():find("could not be verified", 1, true), "Failed icon request reports an unverifiable write")
+providers.foodWater.Build = build
+s:Item(0, 1, 5349)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 3 and s.edits[2].icon == nil and s.macros[1].body == build()
+    and record.lastGeneratedBody == s.macros[1].body and record.lastGeneratedIconKey == MAGE_ICON,
+    "A failed icon request does not suppress unrelated verified body maintenance")
+
+s, settings, ns, providers = New()
+module = ns.modules.generalFoodWaterMacro
+module:Initialize(); s:Flush()
+record = settings.generalFoodWaterMacro.ownedMacros["Food and Water"]
+providers.foodWater.Build = function() return "#showtooltip", nil, nil, AUTO_ICON end
+s.afterEdit = function(macro) macro.icon = nil; s.afterEdit = nil end
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 2 and record.lastGeneratedBody == "#showtooltip"
+    and record.lastGeneratedIconKey == MAGE_ICON and record.lastGeneratedIcon == ICON_IDS[MAGE_ICON],
+    "Invalid icon-only readback retains ownership through its native update notification")
+
+s, settings, ns, providers = New()
+module = ns.modules.generalFoodWaterMacro
+module:Initialize(); s:Flush()
+record = settings.generalFoodWaterMacro.ownedMacros["Food and Water"]
+s.afterEdit = function(macro) macro.icon = nil; s.afterEdit = nil end
+s:Item(0, 1, 5349)
+s:Event("BAG_UPDATE_DELAYED"); s:Flush()
+Check(s.writes == 2 and record.lastGeneratedBody == "#showtooltip"
+    and record.lastGeneratedIconKey == MAGE_ICON and record.lastGeneratedIcon == ICON_IDS[MAGE_ICON],
+    "Missing icon readback after a body/icon edit retains all prior ownership without rollback")
 
 print("PASS: " .. passed .. " provider macro checks")

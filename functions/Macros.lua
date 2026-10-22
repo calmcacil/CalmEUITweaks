@@ -122,14 +122,18 @@ local function ValidName(name)
     return true
 end
 
+local function ValidIcon(icon)
+    return (type(icon) == "number" and icon > 0) or (type(icon) == "string" and icon ~= "")
+end
+
 local function FindNamed(name, accountLimit, characterLimit)
     local matches = {}
     -- Scan both scopes rather than trusting GetMacroIndexByName's first match.
     for index = 1, accountLimit + characterLimit do
-        local ok, macroName, _, body = pcall(GetMacroInfo, index)
+        local ok, macroName, icon, body = pcall(GetMacroInfo, index)
         if not ok then return nil end
         if macroName == name then
-            matches[#matches + 1] = { index = index, body = body }
+            matches[#matches + 1] = { index = index, icon = icon, body = body }
         end
     end
     return matches
@@ -171,6 +175,7 @@ function ns.RegisterMacroProvider(id, provider)
         for index, event in ipairs(provider.events) do refreshEvents[index] = event end
     end
     local frame, active, queued, pendingCombat
+    local failedIconName, failedIconKey
     local generation = 0
     local requested, awaiting = {}, {}
     local status = "Not initialized."
@@ -196,6 +201,7 @@ function ns.RegisterMacroProvider(id, provider)
 
     local function Stop()
         active, queued, pendingCombat = false, false, false
+        failedIconName, failedIconKey = nil, nil
         generation = generation + 1
         requested, awaiting = {}, {}
         if frame then
@@ -269,7 +275,7 @@ function ns.RegisterMacroProvider(id, provider)
         pendingCombat = false
         frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 
-        local body, message, missingSpells = provider.Build()
+        local body, message, missingSpells, desiredIcon = provider.Build()
         if not body then
             if missingSpells then
                 local waiting = false
@@ -286,6 +292,10 @@ function ns.RegisterMacroProvider(id, provider)
         end
         if type(body) ~= "string" or body == "" then
             SetStatus("Macro provider returned an invalid body; no changes made.")
+            return
+        end
+        if desiredIcon ~= nil and (type(desiredIcon) ~= "string" or desiredIcon == "") then
+            SetStatus("Macro provider returned an invalid icon; no changes made.")
             return
         end
         if #body > (MAX_MACRO_LENGTH or 255) then
@@ -321,17 +331,39 @@ function ns.RegisterMacroProvider(id, provider)
                     SetStatus("User-edited macro preserved: '" .. name .. "'. Choose another name to resume.")
                     return
                 end
-                if macro.body == body then
-                    SetStatus("Ready: " .. scopeName .. " macro '" .. name .. "'.")
+                local icon
+                local iconFailed = failedIconName == name and failedIconKey == desiredIcon
+                if desiredIcon and not iconFailed and type(record.lastGeneratedIconKey) == "string"
+                    and ValidIcon(record.lastGeneratedIcon) then
+                    if macro.icon ~= record.lastGeneratedIcon then
+                        record.lastGeneratedIconKey, record.lastGeneratedIcon = nil, nil
+                    elseif desiredIcon ~= record.lastGeneratedIconKey then
+                        icon = desiredIcon
+                    end
+                end
+                if macro.body == body and not icon then
+                    if iconFailed then
+                        SetStatus("Macro icon update could not be verified; toggle the module to retry.")
+                    else
+                        SetStatus("Ready: " .. scopeName .. " macro '" .. name .. "'.")
+                    end
                     return
                 end
-                local ok = pcall(EditMacro, macro.index, nil, nil, body)
-                local readOK, actualName, _, actualBody = pcall(GetMacroInfo, macro.index)
-                if not ok or not readOK or actualName ~= name or actualBody ~= body then
+                local ok = pcall(EditMacro, macro.index, nil, icon, body)
+                local readOK, actualName, actualIcon, actualBody = pcall(GetMacroInfo, macro.index)
+                -- Texture keys can read back as numeric IDs; require an observable icon change.
+                local iconVerified = not icon or (ValidIcon(actualIcon)
+                    and (actualIcon ~= macro.icon or actualIcon == icon))
+                if not ok or not readOK or actualName ~= name or actualBody ~= body or not iconVerified then
+                    -- UPDATE_MACROS may follow even a failed icon-only write.
+                    if icon then failedIconName, failedIconKey = name, icon end
                     SetStatus("Macro update could not be verified; no ownership changes made.")
                     return
                 end
                 record.lastGeneratedBody = body
+                if icon then
+                    record.lastGeneratedIconKey, record.lastGeneratedIcon = icon, actualIcon
+                end
                 SetStatus("Updated " .. scopeName .. " macro '" .. name .. "'.")
                 return
             end
@@ -368,21 +400,26 @@ function ns.RegisterMacroProvider(id, provider)
         end
         -- The client documents nil, not false, as the general-macro flag.
         local perCharacter = not accountScope or nil
-        local ok, index = pcall(CreateMacro, name, "INV_Misc_QuestionMark", body, perCharacter)
+        local ok, index = pcall(CreateMacro, name, desiredIcon or "INV_Misc_QuestionMark", body, perCharacter)
         if not ok or type(index) ~= "number" or not InScope(index, accountLimit)
             or index > accountLimit + characterLimit then
             SetStatus((accountScope and "General" or "Character")
                 .. " macro creation failed; no ownership recorded.")
             return
         end
-        local readOK, actualName, _, actualBody = pcall(GetMacroInfo, index)
-        if not readOK or actualName ~= name or actualBody ~= body then
+        local readOK, actualName, actualIcon, actualBody = pcall(GetMacroInfo, index)
+        if not readOK or actualName ~= name or actualBody ~= body
+            or (desiredIcon and not ValidIcon(actualIcon)) then
             SetStatus("Macro creation could not be verified; no ownership recorded.")
             return
         end
         -- Keep earlier names owned without deleting or updating them on a rename.
         if not records then records = {}; db.ownedMacros = records end
         records[name] = { lastGeneratedBody = body }
+        if desiredIcon then
+            records[name].lastGeneratedIconKey = desiredIcon
+            records[name].lastGeneratedIcon = actualIcon
+        end
         SetStatus("Created " .. scopeName .. " macro '" .. name .. "'.")
     end
 

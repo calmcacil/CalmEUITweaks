@@ -2,136 +2,109 @@
 
 ## Context
 
-[PRODUCT.md](PRODUCT.md) is the behavior contract. The inspected baseline is
-`428b3f6aaf565cd0c786f95757050c6981b00b9e` (0.6.1).
-[Settings](../../core/Settings.lua) currently fills defaults before the CVar
-runner, and its old version validator repairs malformed markers but does not
-reject valid future integers. The CVar runner and quest-only readiness gate must
-be replaced, not retained as a second migration system.
+[PRODUCT.md](PRODUCT.md) defines the approved preference-preserving reset choice.
+At baseline c7be7b8, [Migrations](../../core/Migrations.lua) runs legacy steps
+1..4; [Settings](../../core/Settings.lua) fills defaults afterward and normal
+reset replaces known subtrees. [Lifecycle](../../core/Lifecycle.lua) already
+blocks features until settings are ready. Reuse that runner, event driver and
+barrier rather than adding another lifecycle.
 
 ## Proposed changes
 
-### One runner and four concrete steps
+### Explicit lineages and bridge
 
-Use [core/Migrations.lua](../../core/Migrations.lua), registered as `migrations`
-through the existing module registry, in place of `LegacyCVars.lua`. Declare
-`ns.SCHEMA_VERSION = 4` and a contiguous `ns.schemaMigrations` table. Each entry is
-either a historical CVar cleanup descriptor (`settingsKey`, full old `values`,
-optional `retired`) or a pure-data `migrate(candidate)` function returning literal
-true on verified completion. Never silently treat a missing step as complete.
+Keep the shipped legacy entries unchanged in `ns.legacySchemaMigrations`, with
+fixed `ns.LEGACY_SCHEMA_VERSION = 4`. Declare `ns.SCHEMA_VERSION = 1` for the new
+lineage and a separate `ns.schemaMigrations` table in the same module. The new
+lineage is identified by literal `calm_forever = true`, not by a release number.
 
-- Step 1 preserves the old gathering names, applied values and restoration rules.
-- Step 2 removes recognized account `version`/`cvarVersion`, and performs the
-  existing shared `anchorGap.pixels` migration before defaults obscure absence.
-  Step 4 later retires the whole anchor gap subtree.
-- Step 3 seeds a missing `cursorWashedOut` subtree with `enabled = false`,
-  preserving existing values and making no native writes.
-- Step 4 is the 1.0 cleanup. It removes a defined set of recognized retired
-  account roots (`gatheringSparkles`, `whatsTraining`, `anchorGap`,
-  `spacerCorners` and legacy version markers). Unrecognized keys, including
-  macro-provider settings, are preserved. Character cleanup stays in
-  `InitializeSettings` after the legacy spacer import and removes only the
-  retired `spacers` and `spacerCorners` roots.
+Preflight both raw globals before mutating or reading native state. Accept nil
+roots, reject other non-table roots. Missing marker uses the existing legacy
+validator (schema0..4, CVar0/1, account version absent/1 and conflict checks).
+Present nontrue markers block. Marked stores require integer schemaVersion1..target
+and no legacy account version/CVar metadata; true+missing/0/future/malformed
+checkpoint blocks. Character metadata remains absent/1 version and no schemaVersion.
+Keep marker and checkpoint outside preference defaults.
 
-The generic runner checkpoints after each successful entry. Pure-data callbacks
-receive a temporary deep copy using the existing copy helper; on true completion,
-commit its contents into the original root and write the next checkpoint. A false
-return or exception discards that candidate. This is not a parallel settings store
-for features. CVar steps operate on the persistent ledger and reuse
-`ApplyOwnedCVars(..., false)` because native side effects cannot be rolled back.
+For unmarked data, run outstanding legacy entries to4, checkpointing each as
+before. Then run the baseline step. It restores full historical quest graphics
+and HardwareCursor definitions in disabled mode through the existing persistent
+ledger helper, before staging the preference reset. No native read is needed
+for empty ledgers. Register readiness/world/CVar/combat events only while work
+is pending; own writes do not queue recursion. Failure leaves marker absent and
+legacy checkpoint durable, so reload resumes without guessing prior values.
 
-### Raw metadata preflight
+The baseline entry supports cleanup descriptors followed by a pure-data
+callback. Current descriptors are immutable historical snapshots, not aliases to
+future feature policies. Reuse existing CVar-step execution and atomic copy/commit
+for data steps. A failure or exception does not stamp completion. The final
+account commit includes reset preferences, marker and schema1 together. Future
+marked steps remain ordered and append-only, with no ordinary bridge replay.
 
-Before mutating either root, accept nil as a fresh root and reject other non-table
-roots. Validate canonical account `schemaVersion` as a finite nonnegative integer
-no higher than the declared target. Without it, recognize only legacy `cvarVersion`
-0/1 or absence (0). Validate any legacy CVar field independently, even when a
-canonical checkpoint is present; a legacy checkpoint ahead of canonical is a
-conflict. Legacy account `version` is absent or 1 only, never an adoption source.
-Character metadata accepts absent/1 `version`; no character `schemaVersion` is
-recognized yet. Invalid/future metadata remains untouched. Keep all schema
-markers out of defaults and out of coercing version-normalization helpers.
+### Preference reset and normalization
 
-### Bootstrap sequencing
+Add one `ns.ResetPreferences(db)` helper that recursively assigns only known
+scalar defaults, repairing malformed known tables without replacing valid ones.
+Empty defaults such as spacerLayouts do not erase user contents. This preserves
+nested unknown/provider fields, ownership, chat.default, geometry and restoration
+ledgers. Reuse it for baseline conversion and normal ResetSettings; remove the
+old save-and-reinsert whitelist once redundant. This helper has no lifecycle,
+frames or native writes. Every boolean default, including bag scopes, is false.
 
-`InitializeSettings` validates and migrates raw globals before binding `ns.db` and
-`ns.charDB` or filling defaults. It returns false while pending/blocked. Known
-normalization and per-character spacer import run only after success.
+Stage the baseline account copy before commit; do not invoke public ResetSettings
+from a migration. Normal settings initialization retains lazy character spacer
+import and retired character cleanup. Character data is not reset or certified
+by the account marker. Account/root identity and existing shared stores remain.
 
-The existing lifecycle gains `ns.ResumeStartup()` and separate saved-data-loaded
-and logged-in facts. It retries initialization, invokes feature Initialize once
-when data is ready, then invokes OnLogin and ApplySettings once after login.
-Unrelated addon loads are forwarded only after initialization. No recursive
-completion callback is needed: the outer resume call continues startup itself.
+### Notifications and downgrade safety
 
-Migration readiness events request the migration module through the existing
-coalescer. `RequestApply` permits that one key while `settingsPending` even when
-features are not ready, and rechecks before delivery. The migration module's
-ApplySettings only asks the lifecycle to resume pending startup. It has no
-feature Initialize callback that could restart or recapture bootstrap state.
-
-CVar work waits for login/combat/API readiness. Pure data and empty cleanup steps
-can finish before login. Permanent metadata blocks unsubscribe; transient failures
-use world/variable/CVar/combat notifications as relevant, without timers polling.
-
-### Preferences, options and notifications
-
-Expose one `SavedVariablesReady()` predicate/reason for feature/options consumers.
-Replace the quest-only CVar readiness check. `GetSettings` may serve existing
-defaults before initialization, but mutations and reset return false/reason.
-Commands must honor reset rejection. Native options controls compose their existing
-disabled conditions with saved-data readiness and show its reason.
-
-Capture the pre-default account's nonempty/fresh state and effective starting
-version once. Hold a completion notice until login and emit through `ns.Print`
-once, after successful full startup. Checkpoint persistence prevents replay on
-reload; the notice reports the current session's actual starting checkpoint.
-A 0.6.x account at `cvarVersion=1` becomes `schemaVersion=4` without rerunning step1.
-
-### Adding future migrations
-
-Append the next numbered entry and raise the target together. Data callbacks must
-be pure, deterministic and safe to retry; no frames, hooks, CVar writes or retained
-candidate references. Stage destination values before deleting obsolete source
-fields. Do not mutate schema counters inside the callback. CVar descriptors must
-contain the FULL historical owned definition, not a subset that would lose other
-records during validation. Keep shipped steps immutable. Add character versioning
-separately when a real character schema change exists; an account checkpoint
-cannot certify unloaded characters.
+Capture starting lineage/version and whether raw account data was nonempty.
+Converted existing accounts get one post-login notice naming calm_forever v1 and
+that preferences reset. Fresh and marked-current stores are silent; future marked
+upgrades retain numeric version notices. Do not describe old4->new1 as an ordinary
+numeric upgrade. The in-memory notice cannot guarantee delivery across a crash.
+Older binaries ignore the marker; document backup/restore rather than claiming
+retroactive downgrade protection. External deletion of the marker can replay
+conversion and is not a supported normal operation.
 
 ## Testing and validation
 
-- Upgrade missing/0/1 CVar metadata, schema0/1/2/3/current, and fresh/empty
-  databases; prove no old targeting writes replay for a shipped cvarVersion1
-  account.
-- Exercise step 2 raw gap conversion for direct schema-2 upgrades, step 4
-  retirement of `anchorGap`, `spacerCorners`, `whatsTraining` and other listed
-  roots while unreserved keys survive, false preferences, malformed nested
-  fields, and existing per-character spacer import with character cleanup
-  (product3,9,13).
-- Block malformed/future/conflicting account and character metadata before any
-  mutation, normalization, feature callback, setter or reset (product1,2,10,11).
-- Inject a pure-data failure after candidate mutation, then retry/reload; prove
-  atomic data commit, ordered checkpoints and no later steps running early.
-- Inject CVar rejection/readback failure, combat and missing APIs. Preserve partial
-  cleanup, checkpoint and no-write-before-login guarantees (product4-7).
-- Integrate actual Lifecycle/Settings with dummy features and quest module: pending
-  upgrades defer all feature callbacks; readiness resumes each once, late addon
-  startup works, and queued stale callbacks are harmless (product6,12).
-- Capture notices: existing3->4 and pre-versioned0->4, fresh silence, failure
-  silence, partial retry, no reload/reset repetitions (product8). Confirm live
-  preferences, chat default, spacer geometry, macro ownership and records survive
-  step 4.
-- Run `mise run check`, `git diff --check`, and a read-only safety review. In game,
-  back up SavedVariables, upgrade 0.6.1 and a schema 3 save, inspect the notice
-  and status, reload, and exercise a combat-deferred upgrade. Mocks cannot prove
-  native CVar effects.
+- Product1..3,7: fresh/empty, legacy CVar0/1/schema0..4 versus marked1; all boolean
+  defaults and reset leaves false; preserved choices after marked reload; marker
+  and checkpoint are atomic and excluded from reset/defaults.
+- Product4,9,11: unknown root/live nested fields, account/character/provider macro
+  ownership, actual macro bodies, chat default/receipts, account geometry and lazy
+  character imports; original root identity. Explicitly retired roots remain the
+  preservation exception. Native macro/chat writes never occur on conversion.
+- Product5..8: gathering plus five quest CVars and cursor restore; login, combat,
+  missing APIs/values, setter rejection/throw/readback failure, external values,
+  partial progress/reload/alternate-character, injected data-step failures.
+- Product8: false/string/table marker, marked nil/0/future/malformed checkpoints,
+  legacy metadata conflicts and unsupported opposite root; no mutations/reads or
+  feature callbacks, options editing or successful reset while blocked.
+- Product6,10,12: integration through real Lifecycle/Settings, one startup, pending
+  options disabled then cached recovery, notice timing/silence, released events.
+- Preserve tests that exercise historical entries instead of blindly renumbering
+  old4 assertions to1. Mark current-behavior fixtures explicitly as calm_forever1.
+- Slash reset uses the native EUI popup via the options adapter. CoreOptions
+  tests cancellation/no early mutation, single confirmed reset-before-reload,
+  callback readiness/combat/Unlock Mode rechecks and unavailable APIs or failures.
+  Direct `ResetSettings` stays a non-reloading preference operation for callers.
+- Run focused Lua regressions, full `mise run check`, `git diff --check`, independent
+  read-only safety review and local archive validation using check-package.sh.
+  Prove high-value tests fail when baseline reset/checkpoint or opt-in defaults
+  are temporarily broken, then restore and rerun.
+- Product14: user backs up real SavedVariables and tests fresh install, legacy
+  conversion, pending combat/API cleanup, reload/alt and each opt-in feature.
+  Include cursor response/restore, native bag overlay layering, dividers/search,
+  all macro providers and spacer Save/Discard. Mocks cannot prove native UI/CVars.
 
 ## Parallelization
 
-Keep runtime implementation sequential because runner, lifecycle and settings
-gates are coupled. A local regression author may own only
-`tests/SchemaMigrations.lua` in the same checkout after this contract is fixed;
-the runtime owner adapts existing fixtures and performs combined validation.
-A local read-only safety reviewer can inspect the completed code without editing.
-No additional branch, worktree, PR or release is created by these delegations.
+The orchestrator owns coupled settings, migrations and fixture adaptation in the
+main checkout; read-only reviewers independently inspect the same files without
+edits. Independent implementation workers use isolated worktrees and bounded file
+ownership if needed. Integrate before final combined checks. No agent pushes,
+creates PRs, tags or publishes before user testing and release approval. Avoid
+extra branches/worktrees for read-only review. Recovery state and task contracts
+live under ignored .release/1.0-preparation/SAGA.md.

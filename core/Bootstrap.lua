@@ -1,6 +1,5 @@
-local addonName, ns = ...
+local _, ns = ...
 
-ns.name = addonName
 ns.title = "Calm UI Tweaks"
 ns.modules = {}
 ns.moduleOrder = {}

@@ -5,7 +5,7 @@ ns.defaults = {
     druidRebirthMacro = { enabled = false, name = "Rebirth" },
     druidThornsMacro = { enabled = false, name = "Thorns" },
     generalFoodWaterMacro = { enabled = false, name = "Food and Water" },
-    simpleItemLevel = { enabled = true, inventory = true, reagent = true, bank = true },
+    simpleItemLevel = { enabled = false, inventory = false, reagent = false, bank = false },
     questLootSparkles = { enabled = false },
     cursorWashedOut = { enabled = false },
     lfgLeaderLocation = { enabled = false },
@@ -26,12 +26,12 @@ local function Copy(value)
 end
 ns.Copy = Copy
 
-local function FillDefaults(db, defaults)
+local function FillDefaults(db, defaults, reset)
     for key, value in pairs(defaults) do
         if type(value) == "table" then
             if type(db[key]) ~= "table" then db[key] = {} end
-            FillDefaults(db[key], value)
-        elseif type(db[key]) ~= type(value) then
+            FillDefaults(db[key], value, reset)
+        elseif reset or type(db[key]) ~= type(value) then
             db[key] = value
         end
     end
@@ -46,30 +46,37 @@ local function IsNamedSetting(moduleKey)
     return type(defaults) == "table" and type(defaults.name) == "string"
 end
 
-function ns.InitializeSettings()
-    if not ns.RunSchemaMigrations() then return false end
-    FillDefaults(CalmUITweaksDB, ns.defaults)
-    ns.db = CalmUITweaksDB
-    FillDefaults(CalmUITweaksCharDB, characterDefaults)
-    ns.charDB = CalmUITweaksCharDB
+function ns.ResetPreferences(db)
+    -- Reset preference leaves, not subtrees that also hold user data or ownership.
+    FillDefaults(db, ns.defaults, true)
+    return true
+end
+
+function ns.NormalizeSettings(account, character)
+    FillDefaults(account, ns.defaults)
+    FillDefaults(character, characterDefaults)
     -- The first loaded character seeds missing account layouts; later characters cannot overwrite them.
-    local legacy = ns.charDB.spacers
+    local legacy = character.spacers
     if type(legacy) == "table" then
         for index = 1, 4 do
-            if ns.db.spacerLayouts[index] == nil and type(legacy[index]) == "table" then
-                ns.db.spacerLayouts[index] = Copy(legacy[index])
+            if account.spacerLayouts[index] == nil and type(legacy[index]) == "table" then
+                account.spacerLayouts[index] = Copy(legacy[index])
             end
         end
     end
-    -- Per-character spacer storage moved to the account. Retired character roots
-    -- have no remaining owner; other keys may belong to macro providers.
-    for _, key in ipairs({ "spacers", "spacerCorners" }) do ns.charDB[key] = nil end
+    for _, key in ipairs({ "spacers", "spacerCorners" }) do character[key] = nil end
     for key, value in pairs(ns.defaults) do
         if type(value) == "table" and type(value.name) == "string"
-            and not IsValidMacroName(ns.db[key].name) then
-            ns.db[key].name = value.name
+            and not IsValidMacroName(account[key].name) then
+            account[key].name = value.name
         end
     end
+end
+
+function ns.InitializeSettings()
+    if not ns.RunSchemaMigrations() then return false end
+    ns.NormalizeSettings(CalmUITweaksDB, CalmUITweaksCharDB)
+    ns.db, ns.charDB = CalmUITweaksDB, CalmUITweaksCharDB
     ns.settingsReady = true
     return true
 end
@@ -105,25 +112,7 @@ end
 function ns.ResetSettings()
     local ready, reason = ns.SavedVariablesReady()
     if not ready then return false, reason end
-    -- Preference resets preserve macro ownership and the saved chat setup.
-    local accountOwnership = {}
-    for key, value in pairs(ns.db) do
-        if type(value) == "table" and type(value.ownedMacros) == "table" then
-            accountOwnership[key] = value.ownedMacros
-        end
-    end
-    local chatDefault = ns.db.chat.default
-    local spacerLayouts = ns.db.spacerLayouts
-    local sparkleRestore = ns.db.questLootSparkles.restore
-    local cursorRestore = ns.db.cursorWashedOut.restore
-    for key, value in pairs(ns.defaults) do ns.db[key] = Copy(value) end
-    for key, records in pairs(accountOwnership) do
-        if type(ns.db[key]) == "table" then ns.db[key].ownedMacros = records end
-    end
-    ns.db.chat.default = chatDefault
-    ns.db.spacerLayouts = spacerLayouts
-    ns.db.questLootSparkles.restore = sparkleRestore
-    ns.db.cursorWashedOut.restore = cursorRestore
+    ns.ResetPreferences(ns.db)
     if ns.ready then
         for _, key in ipairs(ns.moduleOrder) do ns.CallModule(key, "ApplySettings") end
     end

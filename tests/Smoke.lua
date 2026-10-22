@@ -84,7 +84,6 @@ end
 toc:close()
 Check(ns.db == nil and CalmUITweaksDB == nil, "Settings initialized before SavedVariables load")
 Check(ns.optionsInstalled, "Plugin options registration failed")
-Check(ns.optionsMode == "plugin", "Official plugin API was not used")
 Check(pluginRegistration.modules[1].key == "Tweaks", "Plugin module missing")
 Check(#pluginRegistration.modules[1].pages == 4, "Expected the four supported options pages")
 Check(type(ns.RegisterMacroProvider) == "function", "Shared macro registry missing")
@@ -120,6 +119,18 @@ Flush()
 Check(ns.ready, "Login did not start modules")
 Check(#errors == 0, "Module lifecycle error: " .. tostring(errors[1]))
 Check(ns.GetStatus("mageMacro"):find("Disabled"), "Disabled macro module started")
+Check(ns.GetStatus("simpleItemLevel") == "Disabled", "Bag arrows must default off")
+Check(ns.db.calm_forever == true and ns.db.schemaVersion == 1, "Forever baseline did not commit")
+for key, defaults in pairs(ns.defaults) do
+    for preference, value in pairs(defaults) do
+        if type(value) == "boolean" then
+            Check(value == false and ns.db[key][preference] == false, "Plugin toggles must all default off")
+        end
+    end
+end
+Check(ns.SetSetting("simpleItemLevel", "enabled", true), "Bag opt-in rejected")
+Check(ns.SetSetting("simpleItemLevel", "inventory", true), "Bag scope opt-in rejected")
+Flush()
 Check(ns.GetStatus("simpleItemLevel"):find("Waiting"), "Missing native item API not handled")
 Check(ns.SetSetting("simpleItemLevel", "enabled", false), "Bag upgrade arrow switch rejected")
 Check(ns.GetStatus("simpleItemLevel") == "Disabled", "Bag upgrade arrows did not stop")

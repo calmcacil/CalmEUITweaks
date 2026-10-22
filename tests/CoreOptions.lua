@@ -73,7 +73,7 @@ end
 local function sandbox(options)
     options = options or {}
     local s = { ns = {}, frames = {}, labels = {}, rows = {}, sections = {}, timers = {},
-        messages = {}, errors = {}, combat = false, loggedIn = false }
+        messages = {}, errors = {}, combat = false, loggedIn = false, reloads = 0 }
     s.loadedAddons = copy(options.loadedAddons or { EllesmereUIBags = true })
     local env = setmetatable({}, { __index = _G })
     s.env = env
@@ -97,6 +97,10 @@ local function sandbox(options)
         return function(err) s.errors[#s.errors + 1] = err end
     end
     env.IsLoggedIn = function() return s.loggedIn end
+    env.ReloadUI = function()
+        s.reloads = s.reloads + 1
+        s.reloadedDB = copy(s.ns.db)
+    end
     env.InCombatLockdown = function() return s.combat end
     env.C_Timer = { After = function(delay, callback)
         equal(delay, 0, "apply debounce delay")
@@ -121,6 +125,10 @@ local function sandbox(options)
     if eui then
         eui.SetFont, eui.SyncProfiles, eui.RegisterModule = forbidden, forbidden, forbidden
         eui.CaptureWidget = forbidden
+        eui.ShowConfirmPopup = function(self, config)
+            equal(self, eui, "confirmation must use a method call")
+            s.confirmPopup = config
+        end
         eui.Widgets = {}
         function eui.Widgets:SectionHeader(parent, text, y)
             s.section = text
@@ -218,6 +226,7 @@ local function core(options) return sandbox(options):load("Core.lua") end
 local function initializedDefaults(s)
     local expected = copy(s.ns.defaults)
     expected.schemaVersion = s.ns.SCHEMA_VERSION
+    expected.calm_forever = true
     return expected
 end
 
@@ -335,12 +344,12 @@ test("default filling preserves false and unknown values while removing retired 
     equal(db.simpleItemLevel.enabled, false)
     equal(db.simpleItemLevel.inventory, false)
     equal(db.simpleItemLevel.reagent, false)
-    equal(db.simpleItemLevel.bank, true)
+    equal(db.simpleItemLevel.bank, false)
     equal(db.unrelated.keep, 17, "unrecognized account keys are preserved")
     equal(db.whatsTraining, nil, "retired account roots are removed")
     equal(db.anchorGap, nil, "retired anchor settings are removed")
     equal(charDB.version, 1)
-    equal(charDB.mageMacro, ownership)
+    same(charDB.mageMacro, ownership)
     equal(charDB.another, false, "unrecognized character keys are preserved")
     equal(charDB.spacerCorners, nil, "retired character roots are removed")
     s:storageUnchanged()
@@ -377,6 +386,33 @@ test("generated macros are opt in with short default names", function()
         equal(s.ns.defaults[key].enabled, false)
         equal(s.ns.defaults[key].name, name)
     end
+end)
+
+test("every plugin toggle is opt in on fresh install and reset", function()
+    local s = core():initialize()
+    local function checkDefaults(defaults, settings)
+        for key, value in pairs(defaults) do
+            if type(value) == "table" then
+                checkDefaults(value, settings[key])
+            elseif type(value) == "boolean" then
+                equal(value, false, "boolean preference default must be off")
+                equal(settings[key], false, "fresh/reset preference must be off")
+            end
+        end
+    end
+    checkDefaults(s.ns.defaults, s.ns.db)
+    for key, defaults in pairs(s.ns.defaults) do
+        for setting, value in pairs(defaults) do
+            if type(value) == "boolean" then truth(s.ns.SetSetting(key, setting, true)) end
+        end
+    end
+    s.ns.db.chat.providerData = { keep = true }
+    s.ns.db.simpleItemLevel.providerData = { keep = true }
+    truth(s.ns.ResetSettings())
+    checkDefaults(s.ns.defaults, s.ns.db)
+    truth(s.ns.db.chat.providerData.keep and s.ns.db.simpleItemLevel.providerData.keep)
+    equal(s.ns.db.calm_forever, true)
+    equal(s.ns.db.schemaVersion, 1)
 end)
 
 test("every macro name preference uses the shared validator", function()
@@ -609,7 +645,8 @@ end)
 
 test("reset restores only preferences and preserves ownership and host storage", function()
     local ownership = { name = "Owned", body = "existing", marker = "owned" }
-    local s = core({ db = { mageMacro = { enabled = false, name = "Custom" } },
+    local s = core({ db = { calm_forever = true, schemaVersion = 1,
+        mageMacro = { enabled = false, name = "Custom" } },
         charDB = { version = 1, mageMacro = ownership } }):initialize()
     local module = s:module("mageMacro")
     s:login()
@@ -674,7 +711,9 @@ test("spacer layouts migrate to account storage without replacing shared layouts
     equal(first.ns.charDB.spacers, nil)
     equal(first.ns.charDB.spacerCorners, nil, "retired character baselines are pruned")
     equal(first.ns.db.spacerCorners, nil, "retired account alignment is pruned")
-    equal(first.ns.charDB.chat, receipt)
+    same(first.ns.charDB.chat, receipt)
+    equal(first.ns.db.spacers.spacer1, false, "baseline conversion is opt in")
+    truth(first.ns.SetSetting("spacers", "spacer1", true))
     local second = core({ db = copy(first.ns.db),
         charDB = { spacers = { [1] = { width = 99, height = 99 } } } }):initialize()
     equal(second.ns.db.spacerLayouts[1].width, 63, "later characters must not overwrite account geometry")
@@ -762,19 +801,112 @@ test("slash status, help, and macro-name handle whitespace and validation", func
     contains(s.messages[#s.messages], "Commands:")
 end)
 
-test("slash reset requires confirmation and preserves character ownership", function()
-    local s = core():initialize():login()
-    s.ns.db.mageMacro.enabled = false
+test("slash reset uses native confirmation and reloads only after preserving user data", function()
+    local s = optionsFixture():initialize():login()
+    s.ns.db.mageMacro.enabled, s.ns.db.mageMacro.name = true, "Custom"
+    s.ns.db.chat.default = { export = "saved", savedAt = 7 }
+    s.ns.db.spacerLayouts[1] = { width = 42 }
     s.ns.charDB.mageMacro.owned = { name = "Existing", body = "existing body" }
-    local before = copy(s.ns.charDB)
-    local slash = s.env.SlashCmdList.CALMUITWEAKS
-    slash("reset")
+    local before, beforeChar = copy(s.ns.db), copy(s.ns.charDB)
+    s.env.SlashCmdList.CALMUITWEAKS("reset")
+    truth(s.confirmPopup, "bare reset must open a native popup")
+    contains(s.confirmPopup.confirmText, "Reload")
+    contains(s.confirmPopup.message, "reload")
+    same(s.ns.db, before, "Opening or cancelling the popup must not reset")
+    equal(s.reloads, 0)
+    s.confirmPopup.onConfirm()
     equal(s.ns.db.mageMacro.enabled, false)
-    contains(s.messages[#s.messages], "reset confirm")
-    slash("reset confirm")
-    equal(s.ns.db.mageMacro.enabled, false)
-    same(s.ns.charDB, before)
-    contains(s.messages[#s.messages], "ownership and existing macros are preserved")
+    equal(s.ns.db.mageMacro.name, "FoodWater")
+    same(s.ns.charDB, beforeChar)
+    same(s.ns.db.chat.default, before.chat.default)
+    same(s.ns.db.spacerLayouts, before.spacerLayouts)
+    equal(s.reloads, 1)
+    same(s.reloadedDB, s.ns.db, "Reload must observe completed reset, not old preferences")
+    s.confirmPopup.onConfirm()
+    equal(s.reloads, 1, "A repeated native callback must not reset/reload twice")
+end)
+
+test("typed reset confirm cannot bypass the native popup", function()
+    local s = optionsFixture():initialize():login()
+    s.ns.db.cursorWashedOut.enabled = true
+    s.env.SlashCmdList.CALMUITWEAKS("reset confirm")
+    truth(s.confirmPopup)
+    equal(s.ns.db.cursorWashedOut.enabled, true)
+    equal(s.reloads, 0)
+end)
+
+test("reset popup waits for login combat and native editing to finish", function()
+    local cases = {
+        { prepare = function(s) s.ns.ready = false end, reason = "login" },
+        { prepare = function(s) s.combat = true end, reason = "combat" },
+        { prepare = function(s) s.env.EllesmereUI.IsUnlockModeActive = function() return true end end,
+            reason = "Unlock Mode" },
+    }
+    for _, case in ipairs(cases) do
+        local s = optionsFixture():initialize():login()
+        s.ns.db.mageMacro.enabled = true
+        local before = copy(s.ns.db)
+        case.prepare(s)
+        s.env.SlashCmdList.CALMUITWEAKS("reset")
+        equal(s.confirmPopup, nil)
+        same(s.ns.db, before)
+        equal(s.reloads, 0)
+        contains(s.messages[#s.messages], case.reason)
+    end
+end)
+
+test("reset confirmation rechecks combat editing and schema readiness", function()
+    local cases = {
+        { prepare = function(s) s.combat = true end, reason = "combat" },
+        { prepare = function(s) s.env.EllesmereUI.IsUnlockModeActive = function() return true end end,
+            reason = "Unlock Mode" },
+        { prepare = function(s) s.ns.settingsReady = false; s.ns.settingsError = "schema blocked" end,
+            reason = "schema blocked" },
+    }
+    for _, case in ipairs(cases) do
+        local s = optionsFixture():initialize():login()
+        s.ns.db.mageMacro.enabled = true
+        s.env.SlashCmdList.CALMUITWEAKS("reset")
+        truth(s.confirmPopup)
+        local before = copy(s.ns.db)
+        case.prepare(s)
+        s.confirmPopup.onConfirm()
+        same(s.ns.db, before)
+        equal(s.reloads, 0)
+        contains(s.messages[#s.messages], case.reason)
+    end
+end)
+
+test("unavailable reset UI or reload API cannot reset preferences", function()
+    for _, missing in ipairs({ "popup", "reload", "adapter" }) do
+        local s = optionsFixture():initialize():login()
+        if missing == "popup" then s.env.EllesmereUI.ShowConfirmPopup = nil
+        elseif missing == "reload" then s.env.ReloadUI = nil
+        else s.ns.RequestReset = nil end
+        s.ns.db.mageMacro.enabled = true
+        local before = copy(s.ns.db)
+        s.env.SlashCmdList.CALMUITWEAKS("reset")
+        same(s.ns.db, before)
+        equal(s.reloads, 0)
+        contains(s.messages[#s.messages], "unavailable")
+    end
+end)
+
+test("failed reset or native popup exceptions do not reload", function()
+    local s = optionsFixture():initialize():login()
+    s.ns.db.mageMacro.enabled = true
+    local before = copy(s.ns.db)
+    s.env.EllesmereUI.ShowConfirmPopup = function() error("popup failed") end
+    truth(pcall(s.env.SlashCmdList.CALMUITWEAKS, "reset"))
+    contains(s.ns.errors.options, "popup failed")
+    same(s.ns.db, before)
+    equal(s.reloads, 0)
+    s = optionsFixture():initialize():login()
+    s.env.SlashCmdList.CALMUITWEAKS("reset")
+    s.ns.ResetSettings = function() return false, "reset rejected" end
+    s.confirmPopup.onConfirm()
+    equal(s.reloads, 0)
+    contains(s.messages[#s.messages], "reset rejected")
 end)
 
 test("empty slash falls back safely when the options adapter is absent", function()
@@ -837,7 +969,6 @@ test("native registration and opening need none of the legacy internals", functi
     local unchanged = unchangedHost(eui)
     s:load("Options.lua")
     equal(s.ns.optionsInstalled, true)
-    equal(s.ns.optionsMode, "plugin")
     equal(s.ns.OpenOptions(), true)
     equal(s.openPluginCalls, 1)
     unchanged()
@@ -852,7 +983,6 @@ test("missing RegisterPlugin disables options without mutating the host or block
     local unchanged = unchangedHost(eui)
     s:load("Options.lua")
     equal(s.ns.optionsInstalled, false)
-    equal(s.ns.optionsMode, nil)
     contains(s.ns.optionsError, "Update EllesmereUI")
     equal(s.pluginCalls, 0)
     equal(s.ns.OpenOptions(), false)
@@ -870,7 +1000,6 @@ local function rejectedPlugin(mutate, expected)
     local unchanged = unchangedHost(eui)
     truth(pcall(s.load, s, "Options.lua"), "native API rejection must not escape chunk loading")
     equal(s.ns.optionsInstalled, false)
-    equal(s.ns.optionsMode, nil)
     local reason = usefulReason(s)
     if expected then contains(reason, expected) end
     equal(s.ns.OpenOptions(), false)
@@ -1030,7 +1159,7 @@ local function checkVisiblePages(s)
         ["Maintain character macro"] = { "mageMacro", "enabled" },
         ["Rebirth / Revive"] = { "druidRebirthMacro", "enabled" },
         ["Self Thorns"] = { "druidThornsMacro", "enabled" },
-        ["Maintain general macro"] = { "generalFoodWaterMacro", "enabled" },
+        ["General food macro"] = { "generalFoodWaterMacro", "enabled" },
         ["Bag upgrade arrows"] = { "simpleItemLevel", "enabled" },
         ["Inventory bags"] = { "simpleItemLevel", "inventory" },
         ["Reagent bags"] = { "simpleItemLevel", "reagent" },
@@ -1073,7 +1202,7 @@ test("General owns personal tweaks and bag upgrade arrows while other settings h
     local expected = {
         General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix",
             "Bag upgrade arrows", "Inventory bags", "Reagent bags", "Bank" },
-        Macro = { "Maintain general macro", "Rebirth / Revive", "Self Thorns",
+        Macro = { "General food macro", "Rebirth / Revive", "Self Thorns",
             "Maintain character macro" },
     }
     local before = copy(s.ns.db)
@@ -1180,10 +1309,10 @@ test("unsupported schema disables options and rejects slash reset without changi
 end)
 
 test("cached controls unlock after a pending schema resumes without rebuilding", function()
-    local s = optionsFixture({db = {schemaVersion = 2}})
+    local s = optionsFixture({db = {calm_forever = true, schemaVersion = 1}})
     local allow = false
-    s.ns.SCHEMA_VERSION = 3
-    s.ns.schemaMigrations[3] = {migrate = function() return allow, "Waiting for migration test." end}
+    s.ns.SCHEMA_VERSION = 2
+    s.ns.schemaMigrations[2] = {migrate = function() return allow, "Waiting for migration test." end}
     s:initialize():login()
     s:build("General")
     local control, rows = s.rows[1].left, #s.rows
@@ -1397,7 +1526,10 @@ end)
 
 test("missing bag addon greys out its controls without changing preferences", function()
     for _, loaded in ipairs({ {}, { EllesmereUIBags = true } }) do
-        local s = optionsFixture({ loadedAddons = loaded }):initialize():login()
+        local s = optionsFixture({ loadedAddons = loaded, db = {
+            calm_forever = true, schemaVersion = 1,
+            simpleItemLevel = { enabled = true, inventory = true, reagent = true, bank = true },
+        } }):initialize():login()
         local before, charBefore = copy(s.ns.db), copy(s.ns.charDB)
         s:build("General")
         local dependencies = {

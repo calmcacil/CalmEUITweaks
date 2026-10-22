@@ -46,14 +46,18 @@ are manual: workflows stay on 24.04 until a newer image and the pinned actionlin
 support are verified together. Ubuntu 26.04 jobs currently run, but actionlint 1.7.12 rejects their
 runner label. Do not suppress workflow lint to accept an automatic OS upgrade.
 
-The consolidated testing release is 0.2.0. While testing, fixes increment the
-patch number and features or breaking changes increment the minor number. Release Please is
-configured to keep breaking changes below 1.0 until stability is explicitly
-declared. When ready, put `Release-As: 1.0.0` in the commit body of a reviewed
-change and inspect the resulting release PR before merging it.
+Main metadata is 0.8.0; 0.2.0 was the historical consolidated testing baseline,
+not the current version. The 1.0.0 candidate stays local until the user completes
+the [in-game checklist](../SPEC.md#in-game-candidate-checklist) and explicitly
+approves publication. No push, release tag, public release or asset upload before
+that approval. Release Please keeps breaking changes below 1.0 until stability
+is explicitly declared.
 
-VERSION, the release manifest, and the TOC version must agree. Release Please
-maintains them and CHANGELOG.md. Addon settings schema versions are independent.
+Only AFTER testing and publication approval, put `Release-As: 1.0.0` in the commit
+body of a reviewed change. Inspect the resulting release PR before merging it;
+merging starts publication, not another testing phase. Do not hand-bump VERSION,
+the release manifest, TOC or CHANGELOG.md: Release Please maintains them together.
+Saved-data lineage/schema metadata is independent of release versions.
 
 ## GitHub App setup
 
@@ -68,7 +72,10 @@ contents: write. The App token lets its release event trigger the publisher.
 
 ## Publishing
 
-1. Merge ordinary Conventional Commit changes to main.
+After user testing and explicit publication approval:
+
+1. Merge the reviewed Conventional Commit changes to main, with the approved
+   `Release-As: 1.0.0` body trailer for the stable transition.
 2. Review and merge the Release Please PR.
 3. Release Please creates the version tag and GitHub Release.
 4. Publish release verifies the published release before checking out its exact
@@ -83,11 +90,12 @@ The package targets Forever interface 16001, requires EllesmereUI, and excludes
 tests and development helpers. Metadata uses flavor forever. No external addon
 hosting credentials are needed for GitHub publication.
 
-When no release exists, publish the prepared 0.2.0 baseline after verification.
-The release coordinator waits for that baseline before creating version bumps.
-Changes limited to CI, tests, or
-documentation do not open a release PR; the coordinator looks for addon changes
-since the latest release. Those supporting changes ship with the next addon release.
+The historical 0.2.0 bootstrap applied only when no release existed. The current
+coordinator still waits for a published baseline before creating automatic bumps;
+if that gate is encountered, stop and agree an approved bootstrap plan rather
+than publishing an obsolete version or bypassing testing. Changes limited to CI,
+tests or documentation do not open a release PR; the coordinator looks for addon
+changes since the latest release. Supporting changes ship with the next addon release.
 
 ## Recovery
 
@@ -97,6 +105,8 @@ or recreate a published tag. Fix incorrect published source in a new release.
 Run recovery from main. Trusted publishing helper changes on main apply to old
 release tags without moving those tags or changing their source.
 
-Download all three assets and run `sha256sum --check checksums.txt`. Roll back
-by installing an earlier verified ZIP. Font assets and registration belong in
-a separate personal SharedMedia addon and are excluded from this plugin.
+Download all three assets and run `sha256sum --check checksums.txt`. Before a
+rollback, back up SavedVariables with the client closed; install an earlier
+verified ZIP with a compatible backup. Older releases ignore `calm_forever` and
+cannot enforce downgrade safety. Font assets and registration belong in a
+separate personal SharedMedia addon and are excluded from this plugin.

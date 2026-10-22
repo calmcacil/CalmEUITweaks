@@ -6,14 +6,17 @@ local WATER = ns.MacroItems.Water
 local function Build()
     local food = ns.MacroSpells.HighestOwned(FOOD)
     local water = ns.MacroSpells.HighestOwned(WATER)
-    if not food or not water then
-        return nil, "Waiting for conjured food and water in your bags."
+    local tooltip = "#showtooltip"
+    if food and water then
+        tooltip = tooltip .. " [btn:2] item:" .. water.item .. "; item:" .. food.item
+    elseif food or water then
+        tooltip = tooltip .. " item:" .. (food or water).item
     end
-    return table.concat({
-        "#showtooltip [btn:2] item:" .. water.item .. "; item:" .. food.item,
-        "/use [btn:1] item:" .. food.item,
-        "/use [btn:2] item:" .. water.item,
-    }, "\n")
+    local lines = { tooltip }
+    if food then lines[#lines + 1] = "/use [btn:1] item:" .. food.item end
+    if water then lines[#lines + 1] = "/use [btn:2] item:" .. water.item end
+    local icon = (food or water) and "INV_Misc_QuestionMark" or "Interface\\Icons\\ClassIcon_Mage"
+    return table.concat(lines, "\n"), nil, nil, icon
 end
 
 ns.RegisterMacroProvider("foodWater", {

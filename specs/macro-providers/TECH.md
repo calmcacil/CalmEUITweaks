@@ -40,7 +40,8 @@ ns.RegisterMacroProvider("stable-id", {
 ```
 
 `Build` is called as `provider.Build()`, never as a method. It returns either
-`body` or `nil, status, missingSpellIDs`. Do not mutate registration metadata
+`body, nil, nil, desiredIcon` (optional fourth value) or
+`nil, status, missingSpellIDs`. Do not mutate registration metadata
 after registration; declared events are copied at registration. Expected
 readiness failures use return values; unexpected exceptions reach the shared
 asynchronous error boundary. Builders do not catch their entire operation or
@@ -90,12 +91,25 @@ and is preserved.
 
 Creation calls `CreateMacro(name, icon, body, true)` for character providers and
 passes nil as the fourth argument for account providers. Capacity checks use the
-returned account and character counts separately. Edits preserve the owned
-macro's name and icon in both scopes.
+returned account and character counts separately. Names and untracked icons are
+preserved on edits. Only newly created macros with a `desiredIcon` acquire
+`lastGeneratedIconKey` (requested texture) and `lastGeneratedIcon` (actual native
+readback, which may be a numeric ID). A matching live icon follows later requested
+key changes; manual icon edits relinquish icon tracking, and adopted macros never
+acquire it. A manual body edit still stops all maintenance. Icon write verification
+checks a usable, observably changed native result, not a guessed texture-to-ID map.
 
-`ns.ResetSettings` restores preference defaults but preserves every
-`ownedMacros` table found on account settings, so general-macro ownership
-survives reset. Character ownership is already outside account defaults.
+Failed icon writes retain the old ownership record and latch the failed name/key
+for the current activation so `UPDATE_MACROS` cannot trigger a retry loop. Other
+body updates can proceed without changing that icon; disabling/re-enabling permits
+a retry. The latch also prevents partial icon readback from being treated as a
+manual customization of the same failed request.
+
+Lineage conversion and `ns.ResetSettings` reset only known preference leaves,
+including macro names and `enabled = false`, without replacing valid live
+subtrees. Account `ownedMacros`, unknown nested/provider fields and character
+ownership survive; actual macros are not changed by the reset. Conversion runs
+once for unmarked data; marked v1 reloads preserve subsequent user preferences.
 
 ## Refresh events and lifecycle
 
@@ -123,13 +137,16 @@ druidThornsMacro = { enabled = false, name = "Thorns" }
 generalFoodWaterMacro = { enabled = false, name = "Food and Water" }
 ```
 
-Every generated macro is opt-in. Existing saved `enabled` values are preserved,
-so an earlier install that had a provider enabled remains enabled.
+Every generated macro is opt-in. Fresh installs and the one-time Calm Forever
+v1 conversion start disabled with default names. Later marked v1 loads preserve
+saved choices; normal reset returns only known preference leaves to defaults.
 
 `InitializeSettings` repairs invalid persisted names for every defaults table
-that has a string `name`. `SetSetting` applies the shared macro-name validation
-to every such key, not only the mage key. Existing names remain limited to 16
-characters and reject controls and `|`.
+that has a string `name`. `SetSetting` trims surrounding whitespace and uses the
+same validation for every such key, not only mage: nonblank text, at most 16 bytes
+(Lua `#name`, using `MAX_MACRO_NAME_LENGTH` when supplied), no controls or `|`.
+Registration/maintenance separately counts at most 16 UTF-8 characters; that does
+not relax Settings' byte limit. Choose provider default names that pass both.
 
 All macro controls live on one **Macro** page. Sections are **General** first,
 then class sections alphabetically; shipped order is General, Druid, Mage. Each
@@ -151,7 +168,7 @@ For every addition:
    label, default name, known tiers, and macro commands. Confirm spells/items
    through wago.tools or the Forever client data, and game/API behavior through
    Blizzard's `forever` wow-ui-source branch.
-2. Add `{ enabled = <default>, name = <defaultName> }` to `ns.defaults` in
+2. Add `{ enabled = false, name = <defaultName> }` to `ns.defaults` in
    `core/Settings.lua`. For character scope, add an empty character table under
    the same key to `InitializeSettings`' character defaults. Account scope uses
    account ownership instead. Do not overwrite existing records.

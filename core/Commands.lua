@@ -12,17 +12,16 @@ SlashCmdList.CALMUITWEAKS = function(message)
         local ok, err = ns.SetSetting("mageMacro", "name", argument)
         ns.Print(ok and "Macro name changed; previous macros are left intact." or err)
     elseif command == "reset" then
-        if argument == "confirm" then
-            local ok, reason = ns.ResetSettings()
-            ns.Print(ok and "Personal preferences reset. Macro ownership and existing macros are preserved. The saved chat default is retained." or reason)
+        if ns.RequestReset then
+            ns.RequestReset()
         else
-            ns.Print("Type /calmtweaks reset confirm to reset only this addon's preferences.")
+            ns.Print("EUI reset confirmation is unavailable; preferences were not reset.")
         end
     elseif command == "" then
         if not ns.OpenOptions or not ns.OpenOptions() then
             ns.Print(ns.optionsError or "EUI options are unavailable, or you are in combat.")
         end
     else
-        ns.Print("Commands: /calmtweaks, status, macro-name <name>, reset confirm.")
+        ns.Print("Commands: /calmtweaks, status, macro-name <name>, reset.")
     end
 end

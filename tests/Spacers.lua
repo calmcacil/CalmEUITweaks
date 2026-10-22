@@ -1,6 +1,7 @@
 -- Run from the parent directory: lua CalmEUITweaks/tests/Spacers.lua
 local tests = 0
 local function fixture(db, charDB, lateListener)
+    if db then db.calm_forever, db.schemaVersion = true, 1 end
     local ns, frames, registry, links, timers = {}, {}, {}, {}, {}
     local combat, active, sessionActive, listener = false, false, false, nil
     local registrations, removals = 0, 0

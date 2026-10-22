@@ -136,7 +136,6 @@ local function Decode(text)
             value.windows[i] = w
         end
         if pos ~= #tokens + 1 or not Validate(value) then error("Invalid layout") end
-        table.sort(value.windows, function(a, b) return a.id < b.id end)
         for _, w in ipairs(value.windows) do table.sort(w.groups); table.sort(w.channels) end
         return value
     end)

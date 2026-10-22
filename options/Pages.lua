@@ -194,8 +194,8 @@ local function BuildPage(page, parent, y)
     elseif page == "Macro" then
         -- General macros first, then class sections in alphabetical order.
         Section("GENERAL")
-        Row(Toggle("generalFoodWaterMacro", "enabled", "Maintain general macro",
-            "Maintains a general (account-wide) macro. Left-click eats the highest-rank conjured food in your bags; right-click drinks the highest-rank conjured water. The macro updates when bag contents change."),
+        Row(Toggle("generalFoodWaterMacro", "enabled", "General food macro",
+            "Creates an account-wide macro, even with empty bags. Left-click eats the highest-rank conjured food in your bags; right-click drinks the highest-rank conjured water. Actions and tooltip update as items enter or leave your bags."),
             RenameButton("generalFoodWaterMacro", "Rename Food and Water", "Rename Macro",
                 "Choose the general macro name. The name and macro are shared by all characters."))
         Text(nil, function()
