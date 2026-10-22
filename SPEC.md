@@ -47,7 +47,7 @@ Runtime Lua must not register `OnUpdate` handlers, repeating tickers or timer
 polling chains. Deferred work uses coalesced, bounded event-triggered callbacks.
 Idle or disabled features release event subscriptions; combat-end listeners are
 armed only while protected work is pending. Unrelated addon loads do not schedule
-geometry or theme work. Runtime, test and packaged Lua must be ASCII only.
+feature work. Runtime, test and packaged Lua must be ASCII only.
 The source/package validator enforces ASCII and the source validator enforces
 the update-handler/ticker restriction.
 
@@ -273,15 +273,15 @@ The existing module status/error boundary reports pending work and failures.
   The EUI input popup edits the account name preference through shared
   validation, preserving existing macros and ownership. Rename is unavailable
   before login and during combat. The current name and status refresh in place.
-- Compatibility shows live bag and training status. Bag scope toggles are
+- Compatibility shows live bag item-level status. Bag scope toggles are
   disabled while bag item levels are off, preserving their saved choices.
-- On Compatibility, bag feature/scope controls require loaded
-  EllesmereUIBags; the training toggle requires loaded WhatsTraining. Native
-  disabled states grey out unavailable controls with dependency tooltips, without
-  altering preferences. Dependency checks use `C_AddOns.IsAddOnLoaded`, prefer
-  its completed-load flag when present, and disable controls if the API is absent.
-  Relevant addon loads refresh cached controls through the existing lifecycle,
-  even when the patch preference is off. Unrelated loads do not refresh options.
+- On Compatibility, bag feature/scope controls require loaded EllesmereUIBags.
+  Native disabled states grey out unavailable controls with dependency tooltips,
+  without altering preferences. Dependency checks use `C_AddOns.IsAddOnLoaded`,
+  prefer its completed-load flag when present, and disable controls if the API is
+  absent. Relevant addon loads refresh cached controls through the existing
+  lifecycle, even when the patch preference is off. Unrelated loads do not
+  refresh options.
 - Native bag item levels replace the former SimpleItemLevel bridge without
   requiring SIL. The existing `simpleItemLevel` preference key and scope switches
   remain intact. Equipment labels use Blizzard's detailed item level, quality
@@ -307,51 +307,6 @@ The existing module status/error boundary reports pending work and failures.
   Hidden/disabled scopes do not scan or compare. Combat changes defer and
   stale callbacks cannot repaint recycled buttons. Disable restores owned native
   visibility without changing native text or SIL saved settings.
-- WhatsTraining matches text and inline colors to the native spellbook's current
-  text color in EUI and Modern skins, using EUI's white default before native
-  controls load. It recognizes both parchment and already-dark WT text, retains
-  WT's dark-theme status tones and each label's alpha, and refreshes on native
-  text recolors, skin/look changes and spellbook show events without polling.
-- The WT tab inherits the native spellbook backdrop and dim page artwork by
-  suppressing its separate coverings. Native spellbook child content is
-  suppressed only while the training overlay is open and restored synchronously
-  when it closes. Background color/opacity stays owned
-  by EUI's spellbook skin, independently of other windows' skin choices.
-- WT's launcher follows overlay visibility and uses the native category tabs'
-  dark selected fill and one-pixel accent underline. Its return tab stays
-  unselected and masks the selected native category button beneath it while
-  open; other category tabs stay visible. Closing WT restores the native button
-  without changing category selection. WT draws an `INV_Misc_Book_09` launcher
-  icon and the current native category's return icon at 36 by 35, centered with
-  the native `SquareMask` clipping two pixels from the top and right. Original
-  WT icons stay untouched behind the replacement textures and return when the
-  fix is disabled. Native square-tab frame/glow artwork stays suppressed across
-  `SetSquareMode` and pooled `Init` calls so all category tabs retain EUI's flat
-  styling. Category changes and pooled button replacements refresh without polling.
-- WT headers follow EUI's Blizzard Skin face, outline and rendered shadow
-  FontObject. Spell rows sample native spellbook name/rank fonts and shadows;
-  controls retain native faces. Each label preserves its ledger size. Spell
-  icons use thin dark edges in compact rows; larger tiles copy native ring art
-  and proportions at EUI's half alpha and half desaturation when the ring fits
-  their height, falling back to dimmed WT rings until native items exist.
-  Heading rows and invisible icons suppress every owned icon decoration.
-  Paging uses image arrows; small dropdowns keep their native art and click
-  handling. Dividers and EUI tab accents use one-pixel lines. The
-  class/weapon toggle is styled around its badge. Its animated glow is hidden
-  through vertex alpha so the native alpha-driven animation can finish without
-  scheduling per-frame theme walks. Native text/color setters update only the
-  changed label. Unchanged native font setters do not schedule theme passes.
-  The hidden spellbook defers theme work until shown. Stable fonts and decoration
-  layouts are cached; hidden pooled rows are skipped until shown. Pooled widgets
-  are picked up on normal layout/show events. Disabling the fix or
-  spellbook skin restores owned alpha, fonts, shadows, colors and markup and
-  hides created decorations, retaining later native or external writes. Failed
-  restoration writes retain ownership and report an error rather than claiming
-  the feature is disabled successfully; later restoration attempts retry them.
-  FontObject restoration retains dependent instance-font and shadow baselines
-  across partial failures. Immediate alpha enforcement requires an active
-  supported spellbook skin; switching that skin off preserves later native alpha
-  writes even if a previous restoration failed.
 - Compatibility fixes default on. Protected restoration waits through combat.
 
 Font assets and SharedMedia registration are outside this plugin. Packages
@@ -364,14 +319,12 @@ must not contain font files; use a separate personal SharedMedia addon.
 | `core/` | Settings, lifecycle, commands and module registry. |
 | `functions/` | Macro maintenance, chat, spacers and anchor behavior. |
 | `macros/` | Class-specific macro providers. |
-| `compatability/` | One bridge per optional addon; spelling matches the source tree. |
 | `options/` | Native EUI plugin registration, pages and chat dialogs. |
 | `tests/` | Standalone Lua regression tests with mocked WoW/EUI APIs. |
 
 Anchor integration depends on EUI's private element registry, anchor records,
-placement hooks and native reapply APIs. WhatsTraining also hooks private skin
-refresh helpers. These dependencies are outside the supported plugin contract;
-revalidate them when updating EUI.
+placement hooks and native reapply APIs. These dependencies are outside the
+supported plugin contract; revalidate them when updating EUI.
 
 ## Verification
 
@@ -416,10 +369,10 @@ Before a release, verify on the installed Forever/EUI build:
   name. Check current name/status after page switching and reload. Toggle bag
   item levels and anchor automation; dependent controls must refresh in place
   and keep their saved values. Check rename availability through combat.
-- [ ] With EllesmereUIBags or WhatsTraining absent/disabled, confirm their
-  controls are greyed out on Compatibility, dependency tooltips are clear,
-  and saved preferences survive reload. If loaded later, controls must
-  refresh without rebuilding the page, including patches saved off.
+- [ ] With EllesmereUIBags absent/disabled, confirm its controls are greyed out
+  on Compatibility, dependency tooltips are clear, and saved preferences survive
+  reload. If loaded later, controls must refresh without rebuilding the page,
+  including patches saved off.
 - [ ] Exercise all spacers, centered-bar chains, resizing, removal, Save/Discard,
   facing corners, scales, manual nudges and combat transitions. Queue a spacer
   enable/disable during editing, enter combat, and confirm the change waits
@@ -432,8 +385,7 @@ Before a release, verify on the installed Forever/EUI build:
   unsupported groups, delayed channels and reserved voice windows. Confirm styling
   preservation and one-time automatic updates after chat becomes ready.
 - [ ] Check localized mage ranks, macro collisions, combat deferral, all bag/bank
-  scopes, item loading, training pages in EUI/Modern skins, live skin changes,
-  late spellbook loading and restoration when fixes or spellbook skins are disabled.
+  scopes and item loading.
 - [ ] With SimpleItemLevel disabled, compare bag-open CPU usage against the bag
   item-level switch off, including idle open bags and equipment/non-equipment
   loot. Check paired rings/trinkets, weapon rules, pending equipped data, native
@@ -441,6 +393,3 @@ Before a release, verify on the installed Forever/EUI build:
   during an equipped-item data request, reopen after a failed completion, and
   check recovery. Level up with an above-level upgrade visible; its red arrow
   must clear when the item becomes usable.
-- [ ] Compare training fonts, tab icons/selection, icon rings, dropdowns, page
-  arrows and header lines with the native spellbook. Switch categories and
-  reopen WT in both skins. Hover the class/weapon toggle and confirm stable FPS.

@@ -3,7 +3,7 @@ local statusLabels = setmetatable({}, { __mode = "k" })
 local refreshing = false
 local failures = setmetatable({}, { __mode = "k" })
 local ownedError
-local dependencies = { simpleItemLevel = "EllesmereUIBags", whatsTraining = "WhatsTraining" }
+local dependencies = { simpleItemLevel = "EllesmereUIBags" }
 
 local function Failed(owner, err)
     failures[owner] = true
@@ -197,11 +197,6 @@ local function BuildPage(page, parent, y)
             Scope("bank", "Bank",
                 "Show equipment item levels in bank bags when bag item levels are enabled."))
         Text(nil, function() return "Status: " .. ns.GetStatus("simpleItemLevel") end)
-        Spacer()
-        Section("WHATSTRAINING")
-        Row(CompatibilityToggle("whatsTraining", "Match spellbook theme",
-            "Themes the entire WhatsTraining spellbook tab to match EUI's fonts, controls and backgrounds while preserving training status colors. Disabling restores owned changes."))
-        Text(nil, function() return "Status: " .. ns.GetStatus("whatsTraining") end)
     elseif page == "Chat" then
         local function Button(text, action, tooltip, needsDefault)
             return {
