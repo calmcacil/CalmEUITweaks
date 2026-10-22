@@ -1,6 +1,7 @@
 -- Run from the parent directory: lua CalmEUITweaks/tests/Spacers.lua
 local tests = 0
 local function fixture(db, charDB, lateListener)
+    if db then db.calm_forever, db.schemaVersion = true, 1 end
     local ns, frames, registry, links, timers = {}, {}, {}, {}, {}
     local combat, active, sessionActive, listener = false, false, false, nil
     local registrations, removals = 0, 0
@@ -64,7 +65,7 @@ local function fixture(db, charDB, lateListener)
             frame:SetPoint("RIGHT", target, "LEFT", 0, 0)
         end
     end
-    for _, file in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/AnchorEvents.lua", "functions/Spacers.lua" }) do
+    for _, file in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "functions/Spacers.lua" }) do
         local chunk = assert(loadfile("CalmEUITweaks/" .. file))
         if setfenv then setfenv(chunk, env)
         else chunk = assert(loadfile("CalmEUITweaks/" .. file, "t", env)) end

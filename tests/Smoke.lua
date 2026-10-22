@@ -73,7 +73,7 @@ for line in toc:lines() do
         if file == "macros/mage.lua" then
             local register = ns.RegisterMacroProvider
             ns.RegisterMacroProvider = function(id, provider)
-                mageProvider = provider
+                if id == "mage" then mageProvider = provider end
                 return register(id, provider)
             end
         end
@@ -84,9 +84,8 @@ end
 toc:close()
 Check(ns.db == nil and CalmUITweaksDB == nil, "Settings initialized before SavedVariables load")
 Check(ns.optionsInstalled, "Plugin options registration failed")
-Check(ns.optionsMode == "plugin", "Official plugin API was not used")
 Check(pluginRegistration.modules[1].key == "Tweaks", "Plugin module missing")
-Check(#pluginRegistration.modules[1].pages == 6, "Expected the six supported options pages")
+Check(#pluginRegistration.modules[1].pages == 4, "Expected the four supported options pages")
 Check(type(ns.RegisterMacroProvider) == "function", "Shared macro registry missing")
 Check(ns.modules.chat == ns.Chat, "Chat preset module missing")
 Check(ns.modules.gatheringSparkles == nil and ns.defaults.gatheringSparkles == nil,
@@ -94,20 +93,47 @@ Check(ns.modules.gatheringSparkles == nil and ns.defaults.gatheringSparkles == n
 Check(ns.modules.questLootSparkles ~= nil, "Quest loot sparkles must remain available")
 
 -- WoW loads this addon's saved data immediately before ADDON_LOADED.
-CalmUITweaksDB = {mageMacro = {enabled = false}}
-CalmUITweaksCharDB = {mageMacro = {ownedMacros = {Keep = {lastGeneratedBody = "owned"}}}}
+CalmUITweaksDB = {
+    mageMacro = { enabled = false },
+    whatsTraining = { enabled = true },
+    anchorGap = { enabled = true, top = 2 },
+    spacerCorners = { player = "TOPLEFT" },
+    unrecognized = { keep = true },
+}
+CalmUITweaksCharDB = {
+    mageMacro = { ownedMacros = { Keep = { lastGeneratedBody = "owned" } } },
+    spacerCorners = { player = { base = -10 } },
+    retiredKey = true,
+}
 Fire("ADDON_LOADED", "CalmEUITweaks")
 Check(ns.initialized and not ns.ready, "Startup ran gameplay before login")
 Check(ns.db.mageMacro.enabled == false, "Saved false preference overwritten")
+Check(ns.db.whatsTraining == nil and ns.db.anchorGap == nil and ns.db.spacerCorners == nil,
+    "Retired account settings survived schema cleanup")
+Check(ns.db.unrecognized.keep == true, "Unrecognized account settings were removed")
+Check(ns.charDB.spacerCorners == nil and ns.charDB.retiredKey == true,
+    "Retired character roots were removed or unrecognized keys were lost")
 loggedIn = true
 Fire("PLAYER_LOGIN")
 Flush()
 Check(ns.ready, "Login did not start modules")
 Check(#errors == 0, "Module lifecycle error: " .. tostring(errors[1]))
 Check(ns.GetStatus("mageMacro"):find("Disabled"), "Disabled macro module started")
+Check(ns.GetStatus("simpleItemLevel") == "Disabled", "Bag arrows must default off")
+Check(ns.db.calm_forever == true and ns.db.schemaVersion == 1, "Forever baseline did not commit")
+for key, defaults in pairs(ns.defaults) do
+    for preference, value in pairs(defaults) do
+        if type(value) == "boolean" then
+            Check(value == false and ns.db[key][preference] == false, "Plugin toggles must all default off")
+        end
+    end
+end
+Check(ns.SetSetting("simpleItemLevel", "enabled", true), "Bag opt-in rejected")
+Check(ns.SetSetting("simpleItemLevel", "inventory", true), "Bag scope opt-in rejected")
+Flush()
 Check(ns.GetStatus("simpleItemLevel"):find("Waiting"), "Missing native item API not handled")
-Check(ns.SetSetting("simpleItemLevel", "enabled", false), "Compatibility switch rejected")
-Check(ns.GetStatus("simpleItemLevel") == "Disabled", "Compatibility did not stop")
+Check(ns.SetSetting("simpleItemLevel", "enabled", false), "Bag upgrade arrow switch rejected")
+Check(ns.GetStatus("simpleItemLevel") == "Disabled", "Bag upgrade arrows did not stop")
 ns.ResetSettings()
 Flush()
 Check(ns.charDB.mageMacro.ownedMacros.Keep.lastGeneratedBody == "owned", "Reset lost macro ownership")
@@ -142,7 +168,7 @@ end
 function EditMacro(index, name, icon, body) writes = writes + 1; macros[index].body = body end
 ns.SetSetting("mageMacro", "enabled", true)
 Flush()
-Check(writes == 1 and ns.charDB.mageMacro.ownedMacros["Mage FoodWater"] ~= nil,
+Check(writes == 1 and ns.charDB.mageMacro.ownedMacros["FoodWater"] ~= nil,
     "Integrated Mage startup did not create a verified owned macro")
 local build = mageProvider.Build
 mageProvider.Build = function() error("injected provider failure") end

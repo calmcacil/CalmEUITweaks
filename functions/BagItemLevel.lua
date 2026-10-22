@@ -9,7 +9,7 @@ local roots = {
     {name = "EUI_BankFrame", scope = "bank"},
 }
 local function WeakKeys() return setmetatable({}, {__mode = "k"}) end
-local buttons, frames, parents, nativeHooks, ownedOverlays = WeakKeys(), WeakKeys(), WeakKeys(), WeakKeys(), WeakKeys()
+local buttons, frames, parents, ownedOverlays = WeakKeys(), WeakKeys(), WeakKeys(), WeakKeys()
 local events = { "BAG_UPDATE_DELAYED", "PLAYER_REGEN_DISABLED", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP" }
 local bankEvents = { "PLAYERBANKSLOTS_CHANGED", "PLAYERREAGENTBANKSLOTS_CHANGED",
     "BANK_TABS_CHANGED", "BANK_TAB_SETTINGS_UPDATED", "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED" }
@@ -96,103 +96,22 @@ local function Usable(button, scope, root, bag)
     return true
 end
 
--- Visibility belongs to EUI except while our item level replaces it.
--- Posthooks record subsequent native Show/Hide requests without changing native text.
-local function RestoreNative(state)
-    if not state.native then return end
-    state.nativeMutation = true
-    state.native:SetShown(state.nativeShown)
-    state.nativeMutation = false
-    state.native, state.nativeShown = nil, nil
-end
-
-local function CanSuppress(region)
-    if not InCombat() then return true end
-    local known = false
-    for _, method in ipairs({"IsProtected", "CanChangeProtectedState"}) do
-        if type(region[method]) == "function" then
-            local ok, result = pcall(region[method], region)
-            if not ok or type(result) ~= "boolean" then return false end
-            if (method == "IsProtected" and result) or (method == "CanChangeProtectedState" and not result) then
-                return false
-            end
-            known = true
-        end
-    end
-    return known
-end
-
-local function SuppressOverlay(state)
-    local hidden = {}
-    for _, key in ipairs({"overlay", "level", "upgrade"}) do
-        local region = state[key]
-        if not region then hidden[key] = true
-        elseif CanSuppress(region) then hidden[key] = pcall(region.Hide, region) end
-    end
-    -- A protected overlay can still have independently mutable regions. If neither
-    -- can be hidden safely, token invalidation is immediate but visuals wait for regen.
-    return hidden.overlay or (hidden.level and hidden.upgrade)
-end
-
+-- EUI keeps ownership of the native item level text. This module only adds its
+-- own upgrade arrow and never changes native bag visuals.
 local function Clear(button)
     local state = buttons[button]
     if not state then return end
     state.token = state.token + 1
-    state.valid = nil
     state.current = nil
-    local suppressed = SuppressOverlay(state)
-    if InCombat() then
-        if not state.native and suppressed then return end
-        deferred = true
-        state.needsClear = true
-        if eventFrame then RegisterEvent("PLAYER_REGEN_ENABLED") end
-        return
-    end
-    state.needsClear = nil
-    RestoreNative(state)
-end
-
-local function OwnNative(button, state)
-    local native = button.ItemLevelText
-    if not native then return end
-    if state.native ~= native then
-        RestoreNative(state)
-        state.native, state.nativeShown = native, native:IsShown()
-    end
-    if not nativeHooks[native] then
-        nativeHooks[native] = true
-        local function OnVisibility(region, shown)
-            local current = buttons[button]
-            if not current or current.native ~= region or current.nativeMutation then return end
-            current.nativeShown = shown
-            if not enabled or not current.valid then return end
-            if InCombat() then
-                deferred = true
-                RegisterEvent("PLAYER_REGEN_ENABLED")
-                return
-            end
-            if shown then
-                current.nativeMutation = true
-                region:Hide()
-                current.nativeMutation = false
-            end
-        end
-        hooksecurefunc(native, "Show", function(self) OnVisibility(self, true) end)
-        hooksecurefunc(native, "Hide", function(self) OnVisibility(self, false) end)
-        if native.SetShown then
-            hooksecurefunc(native, "SetShown", function(self, shown) OnVisibility(self, not not shown) end)
-        end
-    end
-    state.nativeMutation = true
-    native:Hide()
-    state.nativeMutation = false
+    if state.overlay then state.overlay:Hide() end
+    if state.upgrade then state.upgrade:Hide() end
 end
 
 local function SafeUpdate(button)
     local ok = pcall(UpdateButton, button)
     if not ok then
         Clear(button)
-        Failure("Bag display error; using native item levels")
+        Failure("Bag upgrade arrow error")
     end
 end
 
@@ -256,7 +175,6 @@ local function Prepare(button, state)
         state.overlay = overlay
         ownedOverlays[overlay] = true
         overlay:SetAllPoints(button)
-        state.level = overlay:CreateFontString(nil, "OVERLAY")
         state.upgrade = overlay:CreateTexture(nil, "OVERLAY")
         state.upgrade:SetSize(10, 10)
         state.upgrade:SetAtlas("poi-door-arrow-up")
@@ -265,12 +183,8 @@ local function Prepare(button, state)
         state.overlay:SetParent(parent)
     end
     state.overlay:SetFrameLevel(parent:GetFrameLevel() + 2)
-    state.level:ClearAllPoints()
-    state.level:SetPoint("TOPRIGHT", state.overlay, "TOPRIGHT", -2, -2)
-    state.level:SetFontObject(NumberFontNormal)
     state.upgrade:ClearAllPoints()
-    state.upgrade:SetPoint("TOPLEFT", state.overlay, "TOPLEFT", 2, -2)
-    state.level:Hide()
+    state.upgrade:SetPoint("TOPRIGHT", state.overlay, "TOPRIGHT", -2, -2)
     state.upgrade:Hide()
     return true
 end
@@ -381,7 +295,7 @@ UpdateButton = function(button)
             end, ...)
             if not ok and state.token == token then
                 Clear(button)
-                Failure("Item result unavailable; using native item levels")
+                Failure("Item result unavailable")
             end
         end
     end
@@ -392,13 +306,6 @@ UpdateButton = function(button)
         if not level then state.current = nil; return end
         if not Prepare(button, state) then return end
         local quality = item:GetItemQuality()
-        local r, g, b = C_Item.GetItemQualityColor(quality)
-        state.level:SetText(level)
-        state.level:SetTextColor(r or 1, g or 1, b or 1)
-        state.level:Show()
-        state.overlay:Show()
-        state.valid = Valid
-        OwnNative(button, state)
         local upgrade = IsUpgrade(equipLoc, level, quality)
         if upgrade == nil then state.current = nil; return end
         if not upgrade then return end
@@ -406,6 +313,7 @@ UpdateButton = function(button)
         if not name or type(minimum) ~= "number" then state.current = nil; return end
         if minimum > UnitLevel("player") then state.upgrade:SetVertexColor(1, 0, 0)
         else state.upgrade:SetVertexColor(1, 1, 1) end
+        state.overlay:Show()
         state.upgrade:Show()
     end))
 end
@@ -462,7 +370,7 @@ Refresh = function()
     deferred = false
     if not API() then
         for button in pairs(buttons) do Clear(button) end
-        SetStatus("Waiting for native item-level API")
+        SetStatus("Waiting for native item level API")
         return
     end
     local count, failures = 0, failureSerial
@@ -487,7 +395,7 @@ Refresh = function()
         if not scope or not Usable(button, scope, root, bag) then Clear(button) end
     end
     if count == 0 then SetStatus("Waiting for EllesmereUI bag frames")
-    elseif failureSerial == failures then SetStatus("Active: item levels and equipped comparisons") end
+    elseif failureSerial == failures then SetStatus("Active: upgrade arrows") end
 end
 
 Schedule = function(target)
@@ -503,7 +411,7 @@ Schedule = function(target)
             local ok = pcall(Refresh)
             if not ok then
                 for button in pairs(buttons) do Clear(button) end
-                SetStatus("Bag display unavailable; using native item levels")
+                SetStatus("Bag upgrade arrows unavailable")
             end
         end
     end)
@@ -580,8 +488,8 @@ function Module:Initialize()
             for button in pairs(buttons) do Clear(button) end
         end
         if event == "PLAYER_REGEN_ENABLED" then
-            for button, state in pairs(buttons) do
-                if state.needsClear or not enabled then Clear(button) end
+            if not enabled then
+                for button in pairs(buttons) do Clear(button) end
             end
             deferred = false
             UpdateEvents()
@@ -615,10 +523,10 @@ function Module:ApplySettings()
         UpdateEvents()
         SetStatus(InCombat() and "Deferred until combat ends" or "Waiting for bag display")
         Schedule()
-    elseif deferred then
-        RegisterEvent("PLAYER_REGEN_ENABLED")
-        SetStatus("Disabled; native visibility restoration pending combat end")
-    else SetStatus("Disabled") end
+    else
+        deferred = false
+        SetStatus("Disabled")
+    end
 end
 
 function Module:OnAddonLoaded(name)

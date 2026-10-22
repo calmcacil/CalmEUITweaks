@@ -17,8 +17,13 @@ explicit user instruction, follow the user instruction.
   has an open source license or its author has given permission. A public
   repository is not proof of permission. Check the license or permission before
   opening source files, including local sibling addon directories.
-- Research game behavior through Blizzard's UI source, using
-  [wow-ui-source](https://github.com/Gethe/wow-ui-source). Look up game data on
+- Research game behavior through Blizzard's UI source,
+  [wow-ui-source](https://github.com/Gethe/wow-ui-source). Read the `forever`
+  branch to match this addon's interface (16001); `version.txt` there names the
+  patch and build, so confirm it against the installed client before relying on a
+  detail. Client Lua lives under `Interface/AddOns/Blizzard_*`, including the API
+  stubs in `Blizzard_APIDocumentationGenerated`. The `live`, `beta`, and
+  `classic_*` branches target other clients and can differ. Look up game data on
   [wago.tools](https://wago.tools/).
 - Use the author's published documentation for
   [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/) to verify plugin
@@ -95,8 +100,11 @@ explicit user instruction, follow the user instruction.
   ownership. Do not silently delete saved data or reset user preferences during
   a cleanup.
 - Saved-data changes follow `specs/saved-variables/PRODUCT.md` and `TECH.md`.
-  Append schema steps before changing defaults; never stamp the target version
-  without completing the required migrations.
+  Preserve immutable legacy steps 1..4 and their CVar 0/1 adoption. The one-time
+  Calm Forever bridge commits literal `calm_forever = true` with schema 1 only
+  after owned-CVar cleanup and known preference-leaf reset. Marked reloads must
+  preserve later choices; normal reset must retain unknown live nested fields.
+  Append later schema steps; never stamp a checkpoint before its work completes.
 
 ## Repository layout and validation
 

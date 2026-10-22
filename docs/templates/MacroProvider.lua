@@ -12,10 +12,13 @@ local function Build()
     if not name then
         return nil, "Waiting for localized spell data.", { tier.spell }
     end
+    -- Unranked names make the client use the highest learned rank.
     return table.concat({ "#showtooltip", "/cast " .. name }, "\n")
 end
 
--- Replace metadata; add matching settings/character defaults and a TOC entry.
+-- Replace metadata; add matching settings defaults and a TOC entry. Account
+-- providers also pass scope = "account" and class = "ALL", and declare refresh
+-- events only when the body depends on non-spell data.
 ns.RegisterMacroProvider("example", {
     settingsKey = "exampleMacro",
     class = "CLASS_TOKEN",

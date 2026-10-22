@@ -2,90 +2,89 @@
 
 ## Summary
 
-The account database stores the last completed schema migration. When the running
-addon requires a higher version, it upgrades saved data in order before features
-use it, preserves user data on failure, and announces a completed upgrade once.
-
-## Scope
-
-This contract replaces CVar-only versioning. It covers the account database,
-startup safety, cleanup and notifications. It does not version addon releases or
-EUI profiles. Character data keeps its existing supported format; a separate
-character migration counter is deferred until a character schema change needs it.
+The 1.0 release establishes a Calm Forever saved-data lineage. Its first load
+resets plugin preferences to opt-in defaults without discarding user-created data
+or ownership records. Later upgrades preserve preferences unless a migration
+explicitly changes them.
 
 ## Behavior
 
-1. `CalmUITweaksDB.schemaVersion` records the last completed account migration.
-   The code declares a target version. Missing means 0 for pre-versioned data;
-   equal versions require no migration, lower versions require ordered steps,
-   and newer, malformed or conflicting versions block use without repair or deletion.
+1. `CalmUITweaksDB.calm_forever = true` identifies the new lineage.
+   `schemaVersion = 1` is its first completed schema. The marker and checkpoint
+   are metadata, not preferences; normal preference reset preserves both.
 
-2. Shipped `cvarVersion` values 0 and 1 are recognized only when adopting the old
-   format. A missing `schemaVersion` adopts that completed checkpoint, not the
-   release number or legacy `version` field. Unknown CVar versions are not mapped
-   to similarly numbered schema versions. A known canonical schema takes precedence
-   over an equal/older recognized legacy checkpoint.
+2. Missing `calm_forever` identifies pre-1.0 data, not a current schema with a
+   missing flag. Recognized legacy schema versions 0 through 4 and CVar
+   checkpoints 0/1 are upgraded safely before conversion. Fresh installs use
+   the same v1 baseline without an upgrade notice.
 
-3. Schema step 1 retains the shipped gathering CVar cleanup semantics. Step 2
-   adopts general schema versioning, removes the recognized obsolete account
-   `version` and `cvarVersion` fields, and migrates the old shared anchor gap into
-   missing side preferences. Existing side preferences take precedence.
-   Step 3 adds the default-off cursor fix preference without native CVar writes,
-   preserving any existing cursor fix subtree.
+3. On conversion, every known preference returns to its default, including macro
+   names. Every boolean preference is false: macros, bag arrows and all three
+   bag scopes, quest sparkles, cursor fix, LFG labels, chat automation and four
+   spacers. A feature only activates after explicit user action.
 
-4. Every outstanding step runs in order. Its checkpoint advances only on verified
-   success. Failures stop the chain; later steps never run early. Reload resumes
-   at the last completed checkpoint, including upgrades that skip several releases.
+4. Conversion preserves actual game macros, account and character macro
+   ownership, saved chat default, chat receipts, spacer geometry, unknown root
+   keys and unknown fields inside live settings. Historical cleanup still deletes
+   explicitly retired feature roots and invalid CVar ledger entries. Existing character layouts
+   still seed missing account layouts on that character's first compatible load.
+   Existing account layouts win. Offline characters are not claimed to be migrated.
 
-5. Migrations receive raw saved data before default filling and field repair.
-   Data-only steps and empty cleanup steps may complete at the addon's data-load
-   event. Native CVar writes require login and no combat. Temporary readiness
-   failures use bounded existing events, never polling or repeating timers.
+5. Still-owned targeting, sparkle and cursor CVars are restored before conversion
+   completes. Only validated recorded baselines are used; later external writes
+   are preserved. No guessed defaults or unrecognized CVars are written.
+   Native cleanup requires login and no combat. Missing APIs and failed writes
+   retain unfinished records across reloads and character changes.
 
-6. Until migration and normalization complete, features are not initialized or
-   applied and do not receive lifecycle callbacks. This intentionally replaces
-   the previous CVar-only barrier: pending cleanup pauses the whole addon rather
-   than letting features use partially upgraded data. Startup resumes once, including
-   the once-only login callbacks, when the schema becomes ready.
+6. The lineage marker and v1 checkpoint are committed together only after cleanup
+   and preference conversion succeed. Pending conversion does not initialize
+   features, edit options or allow setters/reset. A failed data conversion does
+   not commit tentative preference changes. Partial native restores remain
+   durable because native side effects cannot be rolled back.
 
-7. A data-step failure does not commit its tentative changes. CVar cleanup can
-   complete partially; it retains unresolved restoration records for retry.
-   Cleanup never restores guessed defaults and never writes an unrecognized CVar.
-   A live value different from the recorded addon write is preserved as external.
+7. Once the marker is present and v1 is complete, reload, character switches,
+   later events and normal reset do not repeat conversion. User choices made
+   after conversion survive reload. New marked schemas run later ordered steps
+   and checkpoint only successful steps; missing steps do not count as complete.
 
-8. Fresh installs initialize without an upgrade announcement. Existing nonempty
-   saved data announces successful completion once after login, for example
-   `savedvarsdb updated from "1" to "2"`. The versions are schema versions, not
-   addon releases. Repeated events, reset and reload do not repeat the notice.
-   Failed, pending and unsupported upgrades do not announce success.
+8. Non-table roots, false or malformed lineage markers, unsupported future
+   schemas, missing marked checkpoints, conflicting legacy metadata, and
+   unsupported character metadata are preserved and block startup before either
+   store is changed. A marked v1 store is never interpreted as legacy schema 1.
+   Character metadata still accepts absent/1 `version`; no separate character
+   lineage counter is introduced.
 
-9. Recognized data keeps its enabled/disabled choices, unknown keys, chat default,
-   spacer geometry, macro ownership and character receipts unless an explicit
-   migration changes that field. Defaults are applied only after migration.
-   Nested known fields can be repaired according to their existing contracts.
+9. Supported historical steps remain available and immutable for direct upgrades.
+   Legacy CVar checkpoints do not replay completed targeting cleanup. Retired
+   account roots and legacy account version markers are removed by their ordered
+   steps. Retired character `spacers` and `spacerCorners` roots are removed only
+   after the legacy spacer import; other character data remains.
 
-10. A non-table saved root other than a missing root is preserved and blocked,
-    not silently replaced. Unknown/malformed account schema metadata and unsupported
-    character metadata are checked before either store is changed. Character
-    `version` 1 or absence is supported; a character schema from newer code blocks
-    startup. No offline character is claimed to have been migrated.
+10. Existing nonempty accounts receive one completion notice after login that
+    identifies the Calm Forever v1 baseline and explains that preferences were
+    reset. Fresh/current accounts stay silent. Later same-lineage upgrades use
+    schema-version notices. Pending, failed and unsupported upgrades never
+    announce success; reload and reset do not repeat notices.
 
-11. Reset while ready restores only preferences, preserving schema checkpoint,
-    chat default, spacer geometry and ownership records. Reset and setting changes
-    while an upgrade is pending or blocked are explicitly rejected without changing
-    raw data. They never report a successful reset when none occurred.
+11. Normal reset applies the same opt-in preference defaults while preserving
+    metadata, user data, unknown fields and ownership. Still-owned active CVars
+    restore through their existing feature paths. It does not delete macros,
+    modify chat history or rewrite EUI profiles. Native spacer removal owns link
+    cleanup; no separate EUI layout reset is performed. The slash command opens
+    native EUI confirmation and reloads only after a successful confirmed reset.
+    Cancel is inert; combat, active Unlock Mode, incomplete login and unavailable
+    popup/reload APIs reject without resetting. Conditions are rechecked when
+    confirming, and typed `reset confirm` cannot bypass the popup.
 
-12. Options remain discoverable but editing is disabled while saved data is not
-    ready, with a native disabled-state explanation. Status identifies pending,
-    failed, unsupported and completed upgrades. Unknown versions have no retry
-    subscriptions; migration events are released on completion.
+12. Options remain discoverable while blocked/pending, but editing is disabled
+    with a native explanation. Shared status reports the reason. Startup resumes
+    once when ready and releases migration subscriptions. Readiness retries use
+    bounded events, not polling, repeating timers or update handlers.
 
-13. Existing per-character spacer import remains lazy: each character supplies
-    missing account layouts on its own first compatible load, never overwriting
-    established account geometry. Current character ownership records stay local.
+13. Back up SavedVariables before conversion or downgrading. Older releases that
+    do not recognize `calm_forever` cannot enforce downgrade safety. Version
+    numbers in the old lineage must not be manually relabeled as new v1.
 
-14. Historical steps remain append-only and available for direct upgrades from
-    old releases. Changing a desired CVar policy first restores the full previous
-    owned definition, then lets the current feature acquire its new values.
-    Downgrade protection applies to schema-aware builds; older shipped addons
-    that do not understand `schemaVersion` cannot be made safe retroactively.
+14. The 1.0 candidate is prepared and validated locally, then tested in game by
+    the user. No push, release tag, public release or asset upload occurs before
+    that testing and explicit release approval.

@@ -18,6 +18,7 @@ local function New(saved, current)
     local env = setmetatable({}, { __index = _G })
     env._G = env
     env.CalmUITweaksDB = saved or {}
+    if saved then saved.calm_forever, saved.schemaVersion = true, 1 end
     env.print = function() end
     env.geterrorhandler = function() return function(err) errors[#errors + 1] = err end end
     env.InCombatLockdown = function() return combat end

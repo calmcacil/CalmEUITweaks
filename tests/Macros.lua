@@ -18,7 +18,7 @@ local function New(options)
         macros = {}, timers = {}, frames = {}, requests = {}, known = {}, names = {},
         writes = 0, combat = false, reports = {}, clears = 0,
     }
-    local settings = { enabled = options.enabled ~= false, name = options.name or "Mage FoodWater" }
+    local settings = { enabled = options.enabled ~= false, name = options.name or "FoodWater" }
     local ns = { ready = true, errors = {}, charDB = { version = 1, mageMacro = {} } }
     local module
 
@@ -153,7 +153,7 @@ end
 
 local s, settings, ns, m = New()
 Check(s.provider.settingsKey == "mageMacro" and s.provider.class == "MAGE"
-    and s.provider.classLabel == "Mage" and s.provider.defaultName == "Mage FoodWater"
+    and s.provider.classLabel == "Mage" and s.provider.defaultName == "FoodWater"
     and type(s.provider.Build) == "function", "Mage registration matches provider contract")
 m:Initialize(); s:Flush()
 Check(s.writes == 1, "Initial character creation")
@@ -163,7 +163,7 @@ Check(s.macros[121].body == table.concat({
     "/use [btn:1] item:5350",
     "/castsequence [btn:2] reset=10 Conjure Food, Conjure Water",
 }, "\n"), "Correct generated body")
-Check(ns.charDB.mageMacro.ownedMacros["Mage FoodWater"].lastGeneratedBody == s.macros[121].body,
+Check(ns.charDB.mageMacro.ownedMacros["FoodWater"].lastGeneratedBody == s.macros[121].body,
     "Confirmed ownership")
 m:ApplySettings(); s:Flush()
 Check(s.writes == 1, "No redundant edit")
@@ -179,18 +179,23 @@ s:Event("UPDATE_MACROS"); s:Flush()
 Check(s.writes == 2 and m:GetStatus():find("User-edited", 1, true), "User edits preserved")
 settings.name = "Other"; m:ApplySettings(); s:Flush()
 Check(s.macros[121].body == "/say mine" and s.macros[122], "Rename preserves earlier macro")
-Check(ns.charDB.mageMacro.ownedMacros["Mage FoodWater"] and ns.charDB.mageMacro.ownedMacros.Other,
+Check(ns.charDB.mageMacro.ownedMacros["FoodWater"] and ns.charDB.mageMacro.ownedMacros.Other,
     "Earlier ownership retained")
 s:Event("SPELLS_CHANGED"); settings.enabled = false; m:ApplySettings(); s:Flush()
 Check(s.writes == 3 and next(s.frames[1].events) == nil, "Disable cancels queued work and events")
 
-for _, index in ipairs({ 1, 121 }) do
-    s, settings, ns, m = New()
-    s.macros[index] = { name = "Mage FoodWater", body = "/say legacy" }
-    m:Initialize(); s:Flush()
-    Check(s.writes == 0 and not ns.charDB.mageMacro.ownedMacros
-        and m:GetStatus():find("Name conflict", 1, true), "Unowned name conflict at index " .. index)
-end
+s, settings, ns, m = New()
+s.macros[1] = { name = "FoodWater", body = "/say legacy" }
+m:Initialize(); s:Flush()
+Check(s.writes == 0 and not ns.charDB.mageMacro.ownedMacros
+    and m:GetStatus():find("Name conflict", 1, true), "Account-scope name conflict")
+
+s, settings, ns, m = New()
+s.macros[121] = { name = "FoodWater", body = "/say legacy" }
+m:Initialize(); s:Flush()
+Check(s.writes == 1 and s.macros[121].body == s.provider.Build()
+    and ns.charDB.mageMacro.ownedMacros["FoodWater"].lastGeneratedBody == s.macros[121].body
+    and m:GetStatus():find("Adopted", 1, true), "Unowned character macro is adopted")
 
 s, settings, ns, m = New()
 s.combat = true; m:Initialize(); s:Flush()
@@ -372,8 +377,8 @@ s, settings, ns, m = New()
 body = s.provider.Build()
 s.macros[121] = { name = settings.name, body = body }
 m:Initialize(); s:Flush()
-Check(s.writes == 0 and not ns.charDB.mageMacro.ownedMacros
-    and m:GetStatus():find("Name conflict", 1, true), "Identical unowned body is never adopted")
+Check(s.writes == 0 and ns.charDB.mageMacro.ownedMacros["FoodWater"].lastGeneratedBody == body
+    and m:GetStatus():find("Adopted", 1, true), "Identical unowned body is adopted without a write")
 s, settings, ns, m = New(); m:Initialize(); s:Flush()
 body = s.macros[121].body
 s.macros[1] = { name = settings.name, body = body }

@@ -1,53 +1,53 @@
 # Calm UI Tweaks
 
 A companion addon for [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/)
-on WoW Forever. It adds spacer anchors, automatic anchor gaps, shared chat
-setups, a mage food/water macro, bag item levels and potential upgrade markers,
-quest-object sparkles and LFG leader locations.
+on WoW Forever. It adds spacer anchors, shared chat setups, mage, druid and
+general macros, bag upgrade arrows, quest-object sparkles, LFG leader locations
+and a washed-out cursor fix.
 
 ## Requirements and installation
 
 - WoW Forever, interface version `16001`. Other clients have not been validated.
 - EllesmereUI with plugin API version 1 or later.
-- Optional: EllesmereUIBags for bag item levels.
+- Optional: EllesmereUIBags for bag upgrade arrows.
 
 Place the files in `Interface/AddOns/CalmEUITweaks/`, with `CalmEUITweaks.toc`
 directly inside that folder. Rename a GitHub download's extracted folder if
 necessary. Restart the client after installation.
 
 Open `/calmtweaks`, or select **Calm UI Tweaks > Calm's Tweaks** in EUI.
-The pages are General, Mage Macro, Compatibility, Chat, Spacers and Anchors.
-General contains the sparkle, LFG and cursor fix toggles with live feature status. Configure
-macro maintenance on Mage Macro and bag item levels on Compatibility.
+The pages are General, Macro, Chat and Spacers. General contains the sparkle,
+LFG, cursor fix and bag upgrade arrow controls with live feature status.
+Configure macro maintenance on Macro, grouped as General, Druid and Mage.
 Use `/calmtweaks status` to check dependencies and errors.
 
 ## Features and defaults
 
 | Feature | Default | Purpose |
 | --- | --- | --- |
-| Mage macro | Enabled | Maintains a character macro using supported known food/water ranks. |
-| Bag item levels | Enabled for all scopes | Displays equipment item levels and potential upgrade arrows in EUI inventory, reagent bags and bank. |
+| Mage macro | Off | Maintains a character macro using supported known food/water ranks. |
+| Druid macros | Off | Maintains character macros for Rebirth/Revive and self-cast Thorns. |
+| General macro | Off | Maintains an account-wide food/water macro from the highest conjured items in your bags. |
+| Bag upgrade arrows | Off; all three scopes off | Adds upgrade arrows in EUI inventory, reagent bags and bank; EUI keeps showing native item levels. |
 | Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
 | LFG leader location | Off | Shows the leader's current zone beside each LFG activity. |
 | Cursor washed-out fix | Off | Disables the hardware cursor to work around washed-out cursor colors. |
 | Chat sharing | Manual; automatic updates off | Shares normal tabs, docking order, message groups and channel subscriptions. |
 | Spacer anchors | All four off | Adds invisible, resizable elements to EUI Unlock Mode. |
-| Player/Target corners | EUI Default | Aligns facing corners when these frames are anchored to a spacer. |
-| Automatic anchor gap | Off; 2 pixels per side | Adds outward spacing to new flush edge links. |
 
 Features can be configured independently. Missing optional dependencies leave
 the affected feature waiting. Font assets and registration belong in a separate
 SharedMedia addon; Calm UI Tweaks does not include them.
 
-The addon uses no `OnUpdate` handlers or repeating tickers. Anchor changes use
-native EUI notifications and secure placement hooks; disabled features release
-their event subscriptions. The bag display skips hidden/disabled scopes and
-reuses unchanged item results.
+The addon uses no `OnUpdate` handlers or repeating tickers. Spacer registration
+waits through combat and Unlock Mode sessions; disabled features release their
+event subscriptions. The bag display skips hidden/disabled scopes and reuses
+unchanged item results.
 Opening bags and bag/bank content events trigger updates; equipment and level
-changes refresh comparisons while bags are visible. Repeated native texture,
-quality and refresh calls do no item queries. Equipped item-data notifications
-are subscribed only while a requested lookup is pending in a visible scope;
-reopening bags retries requests whose completion could have been missed.
+changes refresh comparisons while bags are visible. Equipped item-data
+notifications are subscribed only while a requested lookup is pending in a
+visible scope; reopening bags retries requests whose completion could have been
+missed.
 
 ## LFG leader location
 
@@ -93,25 +93,32 @@ that addon and restart the game. Console variables persist independently of
 addons. Calm UI Tweaks cannot recover graphics values previously changed by
 another addon; values already configured for sparkles are left as found.
 
-## Upgrading from gathering sparkles
+## Saved-data upgrades
 
-Ore/herb sparkles have been removed. On upgrade, the addon restores targeting
-settings recorded by the old feature only when they still match its last writes;
-subsequent changes by you or another addon are preserved. Cleanup waits through
-combat or unavailable APIs, keeps unfinished records across reloads, and removes
-the obsolete settings when complete. The account-wide `schemaVersion` now tracks
-all saved-data migrations. Existing 0.6.x `cvarVersion = 1` data adopts that completed
-cleanup and upgrades to schema 3 without replaying it. Step 3 adds the cursor fix
-preference, defaulting off without changing the native cursor. After login, an existing
-account gets one notice such as `savedvarsdb updated from "2" to "3"`; fresh and
-already-current accounts stay silent.
+The 1.0 candidate starts the **Calm Forever v1** saved-data lineage. First load
+converts pre-1.0 accounts once: every known preference returns to its default,
+including macro names, and every switch is off, including all three bag scopes.
+Actual macros, account/character macro ownership, saved chat default and apply
+records, spacer geometry, and unknown fields in live settings are preserved.
+Recognized retired feature roots and invalid CVar ledger entries are exceptions.
+After conversion, your new choices survive reload and character switches.
 
-`/calmtweaks status` reports upgrade progress or errors. Features and options
-editing wait until the saved schema is ready, so nothing uses partially upgraded
-data. Unsupported account or character versions are preserved rather than reset.
-Do not manually raise the version to bypass cleanup. Back up SavedVariables before
-upgrading or downgrading; older releases that do not understand the new schema
-cannot enforce its downgrade protection.
+An absent `calm_forever` marker selects historical schema 0..4/CVar 0..1 cleanup,
+not the new schema 1. Completed targeting cleanup is not replayed. Before the
+conversion commits `calm_forever = true` and `schemaVersion = 1` together, it
+restores still-owned targeting, full quest graphics and cursor CVars from valid
+records. Later external writes remain untouched. Cleanup waits for login, the
+end of combat and available APIs; unresolved records survive reloads. Later
+characters import old spacer geometry only into missing account layouts.
+
+Existing nonempty accounts receive one post-login notice naming Calm Forever v1
+and explaining the preference reset. Fresh and already-current accounts stay
+silent. `/calmtweaks status` explains pending or blocked work; options remain
+visible but editing, reset and feature startup wait for completion. Malformed or
+unsupported account/character data is preserved and blocks startup before either
+store is changed. Do not edit the marker or relabel old versions to bypass cleanup.
+Back up SavedVariables before conversion or downgrading: older releases do not
+understand this marker and cannot provide downgrade safety.
 
 ## Spacer anchors
 
@@ -130,52 +137,13 @@ For TOP/BOTTOM chains, spacer height determines the gap. Spacers follow EUI's
 anchor chains when the central element changes size, and remain invisible and
 noninteractive during gameplay.
 
-Enable switches, size, standalone position and corner choices are account-wide.
-EUI owns the anchor links. Disabling a spacer removes its links;
-detach dependent frames first if you want to preserve their placement.
-Re-enabling keeps saved geometry but requires recreating links. Change enable
-switches outside combat and after closing Unlock Mode. Pending changes also
-wait through combat-suspended Unlock Mode sessions until you finish editing.
-
-### Player and Target corners
-
-Anchor the frame to an enabled spacer, save, and exit Unlock Mode. Then choose
-its corner on the **Spacers** page. The choice names the **unit frame's corner**
-and preserves the native anchor side:
-
-| Native side | Frame corner | Touches spacer corner |
-| --- | --- | --- |
-| LEFT | Top Right / Bottom Right | Top Left / Bottom Left |
-| RIGHT | Top Left / Bottom Left | Top Right / Bottom Right |
-| TOP | Bottom Left / Bottom Right | Top Left / Top Right |
-| BOTTOM | Top Left / Top Right | Bottom Left / Bottom Right |
-
-Corners facing away from the spacer are disabled. A new selection resets
-offsets so the corners touch. Later size changes maintain alignment and retain
-manual nudges. **EUI Default** stops maintaining alignment and leaves the
-current link in place.
-
-## Automatic anchor gaps
-
-Under **Anchors**, enable **Automatic anchor gap** before creating links in
-Unlock Mode. Set Top, Bottom, Left and Right independently from 0 to 10
-physical pixels. Each defaults to 2; zero gives flush placement.
-
-The side sliders are grouped as Top/Bottom and Left/Right. Enable automatic
-anchor gaps to edit them; turning automation off retains their saved values.
-
-The gap moves the child away from the target on only the attached side's axis:
-TOP moves up, BOTTOM down, LEFT left and RIGHT right. The other axis keeps its
-alignment. For action/CDM bar corner presets:
-
-- Horizontal Top/Bottom corners use the Top/Bottom gap and keep left/right edges aligned.
-- Vertical bar corners use the Left/Right gap and keep top/bottom edges aligned.
-
-The feature applies once to a new link whose separation offset is zero.
-Existing links, manual separation offsets, center/diagonal anchors, screen-edge
-links and all spacer links are left alone. Changing defaults affects future
-links. Disabling retains saved gaps. EUI Save and Discard control the resulting
-layout normally.
+Enable switches, size and standalone position are account-wide. EUI owns the
+anchor links, and Unlock Mode Save/Discard keeps spacer geometry. Disabling a
+spacer removes its links; detach dependent frames first if you want to preserve
+their placement. Re-enabling keeps saved geometry but requires recreating links.
+Change enable switches outside combat and after closing Unlock Mode. Pending
+changes also wait through combat-suspended Unlock Mode sessions until you finish
+editing.
 
 ## Shared chat setup
 
@@ -208,48 +176,66 @@ If application fails,
 resolve the reported issue and retry **Apply Default**. Only `CUTCHAT2` is
 supported; save a fresh default for older export formats.
 
-## Mage macro and compatibility
+## Macros and bag upgrade arrows
 
-The default macro is **Mage FoodWater**. Left-click uses food and water;
-right-click alternates their conjure spells. Updates wait until combat ends.
-An existing unowned macro is not overwritten. Choose a free name if there is
-a collision. Editing an owned macro suspends maintenance; disabling or
-renaming the feature does not delete macros.
+Open **Macro** to configure generated macros. Sections are General first, then
+Druid and Mage. Fresh installs, lineage conversion and normal reset leave every
+macro off. Marked v1 reloads preserve enabled choices. Each macro pairs its
+maintenance toggle with a **Rename** button. Macro names are account-wide.
+Enabling a provider adopts the only same-name macro in its scope and updates its
+body. Duplicate names or a same-name macro in the other scope still need a free
+name. Renaming does not delete earlier macros. Editing an owned macro suspends
+maintenance, and disabling a feature does not delete its macro.
 
-Use **Rename Macro** beside the maintenance toggle on **Mage Macro** to choose
-a free name. The page shows the current name and live status. Renaming is
-available after login, outside combat, and changes the account-wide name
-preference. `/calmtweaks macro-name <name>` remains available.
+The default names are **Food and Water** (general), **Rebirth**, **Thorns**, and
+**FoodWater** (mage). Conversion/reset restores these name preferences without
+renaming existing macros. Rename accepts 1-16 bytes of plain text, not 16 Unicode
+characters; control characters and `|` are rejected.
 
-The macro uses the highest supported ranks you have learned, with localized
-conjure spell names. Both food and water spells must be learned. Each right-click
-advances the conjure sequence, which resets after 10 seconds without use. Drag
-the character macro onto an action bar to use it. If localized spell data remains
-unavailable, turn the feature off and on to retry loading it.
+**General food macro** creates one account-wide macro for every class, even with
+empty bags. With no conjured items it contains only `#showtooltip`; newly created
+placeholders use the mage class icon. Food adds a left-click eat action, water
+adds a right-click drink action, and each selects its highest available rank.
+Bag changes add or remove the corresponding actions and update the tooltip/icon.
+Manually chosen and adopted macro icons are preserved. Bank contents do not count;
+the last active character's bags determine this account-wide macro.
 
-For new macro additions, follow the [provider contract](specs/macro-providers/PRODUCT.md)
-and [registration checklist](specs/macro-providers/TECH.md), starting from
+The druid **Rebirth** macro casts Rebirth in combat and Revive out of combat.
+Both spells must be learned. The druid **Thorns** macro casts Thorns on yourself.
+Both use unranked spell names, so the client casts the highest learned rank.
+Drag the character macro onto an action bar to use it.
+
+**FoodWater** remains conjure-based. Left-click uses food and water;
+right-click alternates the conjure spells. Both conjure spells must be learned.
+Each right-click advances the sequence, which resets after 10 seconds without
+use. If localized spell data remains unavailable, turn the feature off and on to
+retry loading it. `/calmtweaks macro-name <name>` changes only the mage name.
+
+Updates wait until combat ends. For new macro additions, follow the
+[provider contract](specs/macro-providers/PRODUCT.md) and
+[registration checklist](specs/macro-providers/TECH.md), starting from
 [`docs/templates/MacroProvider.lua`](docs/templates/MacroProvider.lua).
 
-The **Compatibility** page controls bag and bank item-level scopes, with live
-status. Bag scope controls are disabled while bag item levels are off and retain
-your choices. They are greyed out until EllesmereUIBags is loaded. Tooltips
-identify the required addon; saved preferences remain unchanged.
+The **BAG UPGRADE ARROWS** section below the personal tweaks on **General**
+controls bag, reagent bag and bank scopes with live status. Scope controls are
+disabled while bag upgrade arrows are off and retain your choices. They are
+greyed out until EllesmereUIBags is loaded. Tooltips identify the required addon;
+saved preferences remain unchanged.
 
-Bag item levels use Blizzard's native item API and do not require SimpleItemLevel.
-Labels show equipment item levels in the top right; potential upgrade arrows
-appear in the top left. Rings and trinkets compare against the lower equipped
-slot. One-handed weapons compare against main hand; two-handed weapons must beat
-both weapon slots. Shields and offhand items receive no arrow while a two-handed
-weapon is equipped. Empty slots count as zero; unknown equipped data waits to load.
-Grey/white items receive arrows only for empty matching slots. For two-handed
-weapons, both weapon slots must be empty. Green-or-better items keep the normal
-item-level comparison. Item-level labels remain visible at every quality.
+The arrows use Blizzard's native item API and do not require SimpleItemLevel.
+The feature only adds an up arrow when an item is an item-level upgrade. EUI
+keeps showing its native item-level text and colors; this feature does not hide
+or restyle them. The arrow is red when the item's required level is above your
+level. Comparisons use equipped item levels only: rings and trinkets compare
+against the lower equipped slot, one-handed weapons against the main hand, and
+two-handed weapons must beat both weapon slots. Shields and offhand items
+receive no arrow while a two-handed weapon is equipped. Empty slots count as
+zero; unknown equipped data waits to load. Grey/white items receive arrows only
+for empty matching slots; two-handed candidates require both weapon slots empty.
 These arrows compare item level only, without class usability or stat weighting.
-An arrow is red when the item requires a higher player level. SimpleItemLevel's
-appearance and filtering settings no longer control this display. Existing scope
-preferences remain saved. Disabling releases owned visuals; protected changes
-wait until combat ends.
+The `simpleItemLevel` preference key and the three scope switches remain
+unchanged. Disabling removes owned arrows; protected changes wait until combat
+ends.
 
 ## Commands and saved settings
 
@@ -257,19 +243,25 @@ wait until combat ends.
 /calmtweaks                         Open settings
 /calmtweaks status                  Report feature and dependency status
 /calmtweaks macro-name <name>       Set the mage macro name preference
-/calmtweaks reset                   Show reset instructions
-/calmtweaks reset confirm           Reset addon preferences
+/calmtweaks reset                   Confirm preference reset and UI reload
 ```
 
-Preferences, the chat default and spacer geometry use `CalmUITweaksDB`.
-Character-specific macro ownership, chat apply records and corner baselines use
+Preferences, general-macro ownership, the chat default and spacer geometry use
+`CalmUITweaksDB`. Character-macro ownership and chat apply records use
 `CalmUITweaksCharDB`. These are normal WoW SavedVariables, separate from EUI
 profiles. Existing character spacer geometry seeds missing account layouts on
-first load; later characters cannot replace established account layouts.
-Reset preserves the schema checkpoint, saved chat default, spacer geometry and
-character records, disables chat automation and spacers, and does not delete
-macros or rewrite EUI profiles. Reset and setting changes are rejected while an
-upgrade is pending or blocked; the status reason explains why.
+that character's first compatible load; established account layouts win. Retired
+character spacer roots are removed after import, not on behalf of offline characters.
+
+Normal reset changes only known preference leaves, including names and all
+switches. It preserves lineage/checkpoint metadata, unknown live nested/provider
+fields, macro ownership, chat default/receipts, geometry and character records.
+It restores still-owned active CVars without deleting macros, changing chat
+history or rewriting EUI profiles. Reset and setting changes are rejected while
+an upgrade is pending or blocked; the status reason explains why. The slash
+command opens an EUI confirmation popup; Cancel changes nothing, while Reset and
+Reload resets preferences then reloads the UI. Finish combat and Unlock Mode
+before resetting. Readiness is checked again when you confirm.
 
 ## Development
 
@@ -281,8 +273,10 @@ tests do not replace verification in WoW. Before changing saved data, follow the
 [schema step-authoring guide](specs/saved-variables/TECH.md). Native console changes
 also follow the [CVar cleanup guide](specs/cvar-migrations/TECH.md).
 
-The consolidated testing release is **0.2.0**. A future **1.0.0**
-will mark the first stable release. Download the installable ZIP from
+Main's version metadata is **0.8.0** while the **1.0.0 candidate** is prepared
+for user testing. It is not publication approval. Complete the in-game checklist
+in [SPEC.md](SPEC.md) before requesting release approval; do not hand-edit versions.
+Download published installable ZIPs from
 [GitHub Releases](https://github.com/calmcacil/CalmEUITweaks/releases).
 See [CI and releases](docs/CI_RELEASES.md) for automated checks, versioning,
 release App setup, and recovery.

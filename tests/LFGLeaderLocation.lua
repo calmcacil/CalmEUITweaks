@@ -9,7 +9,8 @@ local function Sandbox(enabled, late)
     local s = { ns = {}, frames = {}, timers = {}, rows = {}, leaders = {}, errors = {}, queries = 0, hooks = 0 }
     local env = setmetatable({}, { __index = _G })
     env._G = env
-    env.CalmUITweaksDB = { lfgLeaderLocation = { enabled = enabled } }
+    env.CalmUITweaksDB = { calm_forever = true, schemaVersion = 1,
+        lfgLeaderLocation = { enabled = enabled } }
     env.InCombatLockdown = function() return s.combat end
     env.IsLoggedIn = function() return false end
     env.geterrorhandler = function() return function(err) s.errors[#s.errors + 1] = err end end

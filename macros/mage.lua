@@ -1,24 +1,7 @@
 local addonName, ns = ...
 
-local FOOD = {
-    { level = 52, spell = 28612, item = 22895 },
-    { level = 42, spell = 10145, item = 8076 },
-    { level = 32, spell = 10144, item = 8075 },
-    { level = 22, spell = 6129, item = 1487 },
-    { level = 12, spell = 990, item = 1114 },
-    { level = 6, spell = 597, item = 1113 },
-    { level = 1, spell = 587, item = 5349 },
-}
-
-local WATER = {
-    { level = 52, spell = 10140, item = 8079 },
-    { level = 42, spell = 10139, item = 8078 },
-    { level = 32, spell = 10138, item = 8077 },
-    { level = 22, spell = 6127, item = 3772 },
-    { level = 12, spell = 5506, item = 2136 },
-    { level = 6, spell = 5505, item = 2288 },
-    { level = 1, spell = 5504, item = 5350 },
-}
+local FOOD = ns.MacroItems.Food
+local WATER = ns.MacroItems.Water
 
 local function Build()
     local food = ns.MacroSpells.HighestKnown(FOOD)
@@ -46,6 +29,6 @@ ns.RegisterMacroProvider("mage", {
     settingsKey = "mageMacro",
     class = "MAGE",
     classLabel = "Mage",
-    defaultName = "Mage FoodWater",
+    defaultName = "FoodWater",
     Build = Build,
 })

@@ -1,6 +1,5 @@
-local addonName, ns = ...
+local _, ns = ...
 
-ns.name = addonName
 ns.title = "Calm UI Tweaks"
 ns.modules = {}
 ns.moduleOrder = {}
@@ -12,6 +11,10 @@ local refreshing = false
 
 function ns.Print(message)
     print("|cffdca77fCalm UI Tweaks:|r " .. tostring(message))
+end
+
+function ns.IsEUIAddon(name)
+    return type(name) == "string" and name:match("^EllesmereUI") ~= nil
 end
 
 function ns.RegisterModule(key, module)

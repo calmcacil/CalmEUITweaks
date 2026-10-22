@@ -3,6 +3,28 @@ local modules = {}
 
 ns.MacroSpells = {}
 
+-- Conjured food and water tiers are shared by the mage and general providers.
+ns.MacroItems = {
+    Food = {
+        { level = 52, spell = 28612, item = 22895 },
+        { level = 42, spell = 10145, item = 8076 },
+        { level = 32, spell = 10144, item = 8075 },
+        { level = 22, spell = 6129, item = 1487 },
+        { level = 12, spell = 990, item = 1114 },
+        { level = 6, spell = 597, item = 1113 },
+        { level = 1, spell = 587, item = 5349 },
+    },
+    Water = {
+        { level = 52, spell = 10140, item = 8079 },
+        { level = 42, spell = 10139, item = 8078 },
+        { level = 32, spell = 10138, item = 8077 },
+        { level = 22, spell = 6127, item = 3772 },
+        { level = 12, spell = 5506, item = 2136 },
+        { level = 6, spell = 5505, item = 2288 },
+        { level = 1, spell = 5504, item = 5350 },
+    },
+}
+
 local function IsKnown(spellID)
     local checks = {
         C_SpellBook and C_SpellBook.IsSpellKnownOrInSpellBook,
@@ -41,6 +63,52 @@ function ns.MacroSpells.Name(spellID)
     end
 end
 
+local function ContainerSlots(bag)
+    if C_Container and C_Container.GetContainerNumSlots then
+        local ok, slots = pcall(C_Container.GetContainerNumSlots, bag)
+        if ok and type(slots) == "number" then return slots end
+    end
+    if GetContainerNumSlots then
+        local ok, slots = pcall(GetContainerNumSlots, bag)
+        if ok and type(slots) == "number" then return slots end
+    end
+    return 0
+end
+
+local function ContainerItemID(bag, slot)
+    if C_Container and C_Container.GetContainerItemInfo then
+        local ok, info = pcall(C_Container.GetContainerItemInfo, bag, slot)
+        if ok and info and info.itemID then return info.itemID end
+    end
+    if C_Container and C_Container.GetContainerItemID then
+        local ok, itemID = pcall(C_Container.GetContainerItemID, bag, slot)
+        if ok then return itemID end
+    end
+    if GetContainerItemID then
+        local ok, itemID = pcall(GetContainerItemID, bag, slot)
+        if ok then return itemID end
+    end
+end
+
+-- Bags only: bank contents are not usable while eating or drinking.
+local function BagItems()
+    local items = {}
+    for bag = 0, NUM_BAG_SLOTS or 4 do
+        for slot = 1, ContainerSlots(bag) do
+            local itemID = ContainerItemID(bag, slot)
+            if itemID then items[itemID] = true end
+        end
+    end
+    return items
+end
+
+function ns.MacroSpells.HighestOwned(tiers)
+    local items = BagItems()
+    for _, tier in ipairs(tiers) do
+        if tier.item and items[tier.item] then return tier end
+    end
+end
+
 local function ValidName(name)
     if type(name) ~= "string" or not name:find("%S") or name:find("%c") then
         return false, "Enter a nonempty macro name without control characters."
@@ -54,21 +122,37 @@ local function ValidName(name)
     return true
 end
 
+local function ValidIcon(icon)
+    return (type(icon) == "number" and icon > 0) or (type(icon) == "string" and icon ~= "")
+end
+
 local function FindNamed(name, accountLimit, characterLimit)
     local matches = {}
     -- Scan both scopes rather than trusting GetMacroIndexByName's first match.
     for index = 1, accountLimit + characterLimit do
-        local ok, macroName, _, body = pcall(GetMacroInfo, index)
+        local ok, macroName, icon, body = pcall(GetMacroInfo, index)
         if not ok then return nil end
         if macroName == name then
-            matches[#matches + 1] = { index = index, body = body }
+            matches[#matches + 1] = { index = index, icon = icon, body = body }
         end
     end
     return matches
 end
 
+local function ValidEvents(events)
+    if events == nil then return true end
+    if type(events) ~= "table" then return false end
+    local count = 0
+    for _, event in pairs(events) do
+        count = count + 1
+        if type(event) ~= "string" or not event:find("%S") or event:find("%c") then return false end
+    end
+    return count == #events
+end
+
 -- Provider contract and addition checklist: specs/macro-providers/TECH.md.
 function ns.RegisterMacroProvider(id, provider)
+    local scope = type(provider) == "table" and provider.scope or "character"
     assert(type(id) == "string" and id:find("%S") and not id:find("%c")
         and not modules[id], "Duplicate or invalid macro provider")
     assert(type(provider) == "table" and type(provider.Build) == "function"
@@ -78,12 +162,20 @@ function ns.RegisterMacroProvider(id, provider)
         and not provider.class:find("%c")
         and type(provider.classLabel) == "string" and provider.classLabel:find("%S")
         and not provider.classLabel:find("%c")
-        and ValidName(provider.defaultName),
+        and ValidName(provider.defaultName)
+        and (scope == "character" or scope == "account")
+        and ValidEvents(provider.events),
         "Invalid macro provider contract")
 
     local Module = { asyncErrors = true }
     local key = provider.settingsKey
+    local accountScope = scope == "account"
+    local refreshEvents = {}
+    if provider.events then
+        for index, event in ipairs(provider.events) do refreshEvents[index] = event end
+    end
     local frame, active, queued, pendingCombat
+    local failedIconName, failedIconKey
     local generation = 0
     local requested, awaiting = {}, {}
     local status = "Not initialized."
@@ -102,12 +194,14 @@ function ns.RegisterMacroProvider(id, provider)
     end
 
     local function IsEligible()
+        if provider.class == "ALL" then return true end
         local _, class = UnitClass("player")
         return class == provider.class
     end
 
     local function Stop()
         active, queued, pendingCombat = false, false, false
+        failedIconName, failedIconKey = nil, nil
         generation = generation + 1
         requested, awaiting = {}, {}
         if frame then
@@ -154,8 +248,14 @@ function ns.RegisterMacroProvider(id, provider)
     end
 
     local function Ownership()
-        if type(ns.charDB) ~= "table" or type(ns.charDB[key]) ~= "table" then return nil end
-        return ns.charDB[key]
+        local root = accountScope and ns.db or ns.charDB
+        if type(root) ~= "table" or type(root[key]) ~= "table" then return nil end
+        return root[key]
+    end
+
+    local function InScope(index, accountLimit)
+        if accountScope then return index <= accountLimit end
+        return index > accountLimit
     end
 
     Run = function()
@@ -175,7 +275,7 @@ function ns.RegisterMacroProvider(id, provider)
         pendingCombat = false
         frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 
-        local body, message, missingSpells = provider.Build()
+        local body, message, missingSpells, desiredIcon = provider.Build()
         if not body then
             if missingSpells then
                 local waiting = false
@@ -194,6 +294,10 @@ function ns.RegisterMacroProvider(id, provider)
             SetStatus("Macro provider returned an invalid body; no changes made.")
             return
         end
+        if desiredIcon ~= nil and (type(desiredIcon) ~= "string" or desiredIcon == "") then
+            SetStatus("Macro provider returned an invalid icon; no changes made.")
+            return
+        end
         if #body > (MAX_MACRO_LENGTH or 255) then
             SetStatus("Localized macro exceeds the body length limit; no changes made.")
             return
@@ -203,7 +307,12 @@ function ns.RegisterMacroProvider(id, provider)
             return
         end
         local db = Ownership()
-        if not db then SetStatus("Character settings are unavailable; no changes made."); return end
+        if not db then
+            SetStatus((accountScope and "Account" or "Character")
+                .. " settings are unavailable; no changes made.")
+            return
+        end
+        local scopeName = accountScope and "general" or "character"
         local accountLimit = MAX_ACCOUNT_MACROS or 120
         local characterLimit = MAX_CHARACTER_MACROS or 18
         local matches = FindNamed(name, accountLimit, characterLimit)
@@ -212,51 +321,106 @@ function ns.RegisterMacroProvider(id, provider)
         local record = records and records[name]
         if #matches > 0 then
             local macro = matches[1]
-            if #matches ~= 1 or macro.index <= accountLimit or type(record) ~= "table"
-                or type(record.lastGeneratedBody) ~= "string" then
+            if #matches ~= 1 or not InScope(macro.index, accountLimit) then
                 SetStatus("Name conflict: '" .. name .. "'. Choose another name or rename the existing macro.")
                 return
             end
-            if macro.body ~= record.lastGeneratedBody then
-                SetStatus("User-edited macro preserved: '" .. name .. "'. Choose another name to resume.")
+            local owned = type(record) == "table" and type(record.lastGeneratedBody) == "string"
+            if owned then
+                if macro.body ~= record.lastGeneratedBody then
+                    SetStatus("User-edited macro preserved: '" .. name .. "'. Choose another name to resume.")
+                    return
+                end
+                local icon
+                local iconFailed = failedIconName == name and failedIconKey == desiredIcon
+                if desiredIcon and not iconFailed and type(record.lastGeneratedIconKey) == "string"
+                    and ValidIcon(record.lastGeneratedIcon) then
+                    if macro.icon ~= record.lastGeneratedIcon then
+                        record.lastGeneratedIconKey, record.lastGeneratedIcon = nil, nil
+                    elseif desiredIcon ~= record.lastGeneratedIconKey then
+                        icon = desiredIcon
+                    end
+                end
+                if macro.body == body and not icon then
+                    if iconFailed then
+                        SetStatus("Macro icon update could not be verified; toggle the module to retry.")
+                    else
+                        SetStatus("Ready: " .. scopeName .. " macro '" .. name .. "'.")
+                    end
+                    return
+                end
+                local ok = pcall(EditMacro, macro.index, nil, icon, body)
+                local readOK, actualName, actualIcon, actualBody = pcall(GetMacroInfo, macro.index)
+                -- Texture keys can read back as numeric IDs; require an observable icon change.
+                local iconVerified = not icon or (ValidIcon(actualIcon)
+                    and (actualIcon ~= macro.icon or actualIcon == icon))
+                if not ok or not readOK or actualName ~= name or actualBody ~= body or not iconVerified then
+                    -- UPDATE_MACROS may follow even a failed icon-only write.
+                    if icon then failedIconName, failedIconKey = name, icon end
+                    SetStatus("Macro update could not be verified; no ownership changes made.")
+                    return
+                end
+                record.lastGeneratedBody = body
+                if icon then
+                    record.lastGeneratedIconKey, record.lastGeneratedIcon = icon, actualIcon
+                end
+                SetStatus("Updated " .. scopeName .. " macro '" .. name .. "'.")
                 return
             end
-            if macro.body == body then SetStatus("Ready: character macro '" .. name .. "'."); return end
-            local ok = pcall(EditMacro, macro.index, nil, nil, body)
-            local readOK, actualName, _, actualBody = pcall(GetMacroInfo, macro.index)
-            if not ok or not readOK or actualName ~= name or actualBody ~= body then
-                SetStatus("Macro update could not be verified; no ownership changes made.")
-                return
+
+            -- An enabled provider adopts the sole same-name macro in its scope.
+            local changed = macro.body ~= body
+            if changed then
+                local ok = pcall(EditMacro, macro.index, nil, nil, body)
+                local readOK, actualName, _, actualBody = pcall(GetMacroInfo, macro.index)
+                if not ok or not readOK or actualName ~= name or actualBody ~= body then
+                    SetStatus("Macro adoption could not be verified; no ownership changes made.")
+                    return
+                end
             end
-            record.lastGeneratedBody = body
-            SetStatus("Updated character macro '" .. name .. "'.")
+            if not records then records = {}; db.ownedMacros = records end
+            records[name] = { lastGeneratedBody = body }
+            SetStatus((changed and "Adopted and updated " or "Adopted ")
+                .. scopeName .. " macro '" .. name .. "'.")
             return
         end
 
-        local countOK, _, characterCount = pcall(GetNumMacros)
-        if not countOK or type(characterCount) ~= "number" then
-            SetStatus("Could not check character macro capacity; no changes made.")
+        local countOK, accountCount, characterCount = pcall(GetNumMacros)
+        local count = characterCount
+        if accountScope then count = accountCount end
+        if not countOK or type(count) ~= "number" then
+            SetStatus("Could not check " .. scopeName .. " macro capacity; no changes made.")
             return
         end
-        if characterCount >= characterLimit then
-            SetStatus("Character macro slots are full; free a slot or disable this module.")
+        local limit = accountScope and accountLimit or characterLimit
+        if count >= limit then
+            SetStatus((accountScope and "General" or "Character")
+                .. " macro slots are full; free a slot or disable this module.")
             return
         end
-        local ok, index = pcall(CreateMacro, name, "INV_Misc_QuestionMark", body, true)
-        if not ok or type(index) ~= "number" or index <= accountLimit
+        -- The client documents nil, not false, as the general-macro flag.
+        local perCharacter = not accountScope or nil
+        local ok, index = pcall(CreateMacro, name, desiredIcon or "INV_Misc_QuestionMark", body, perCharacter)
+        if not ok or type(index) ~= "number" or not InScope(index, accountLimit)
             or index > accountLimit + characterLimit then
-            SetStatus("Character macro creation failed; no ownership recorded.")
+            SetStatus((accountScope and "General" or "Character")
+                .. " macro creation failed; no ownership recorded.")
             return
         end
-        local readOK, actualName, _, actualBody = pcall(GetMacroInfo, index)
-        if not readOK or actualName ~= name or actualBody ~= body then
+        local readOK, actualName, actualIcon, actualBody = pcall(GetMacroInfo, index)
+        if not readOK or actualName ~= name or actualBody ~= body
+            or (desiredIcon and not ValidIcon(actualIcon)) then
             SetStatus("Macro creation could not be verified; no ownership recorded.")
             return
         end
         -- Keep earlier names owned without deleting or updating them on a rename.
         if not records then records = {}; db.ownedMacros = records end
         records[name] = { lastGeneratedBody = body }
-        SetStatus("Created character macro '" .. name .. "'.")
+        if desiredIcon then
+            records[name].lastGeneratedIconKey = desiredIcon
+            records[name].lastGeneratedIcon = actualIcon
+        end
+        SetStatus("Created " .. scopeName .. " macro '" .. name .. "'.")
     end
 
     function Module:Initialize()
@@ -301,6 +465,9 @@ function ns.RegisterMacroProvider(id, provider)
             end)
             for _, event in ipairs({ "PLAYER_LEVEL_UP", "SPELLS_CHANGED", "LEARNED_SPELL_IN_TAB",
                 "UPDATE_MACROS" }) do
+                pcall(frame.RegisterEvent, frame, event)
+            end
+            for _, event in ipairs(refreshEvents) do
                 pcall(frame.RegisterEvent, frame, event)
             end
         end
