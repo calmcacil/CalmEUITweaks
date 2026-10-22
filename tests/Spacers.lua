@@ -64,7 +64,7 @@ local function fixture(db, charDB, lateListener)
             frame:SetPoint("RIGHT", target, "LEFT", 0, 0)
         end
     end
-    for _, file in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/AnchorEvents.lua", "functions/Spacers.lua" }) do
+    for _, file in ipairs({ "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "functions/Spacers.lua" }) do
         local chunk = assert(loadfile("CalmEUITweaks/" .. file))
         if setfenv then setfenv(chunk, env)
         else chunk = assert(loadfile("CalmEUITweaks/" .. file, "t", env)) end

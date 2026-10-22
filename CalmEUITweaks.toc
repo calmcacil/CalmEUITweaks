@@ -15,14 +15,13 @@ core\Settings.lua
 core\CVars.lua
 core\Migrations.lua
 core\Lifecycle.lua
-core\AnchorEvents.lua
 core\Commands.lua
 functions\Macros.lua
 macros\mage.lua
+macros\druid.lua
+macros\general.lua
 functions\Chat.lua
 functions\Spacers.lua
-functions\AnchorGap.lua
-functions\SpacerCorners.lua
 functions\BagItemLevel.lua
 functions\QuestLootSparkles.lua
 functions\CursorWashedOut.lua

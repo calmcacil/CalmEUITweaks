@@ -8,8 +8,8 @@ requirements. User setup instructions are in [README.md](README.md).
 The addon targets WoW Forever interface `16001` and requires EllesmereUI.
 Options require plugin API version 1 or later, with callable `RegisterPlugin`
 and `OpenPlugin` functions. Registration creates a bottom section named
-**Calm UI Tweaks**, containing **Calm's Tweaks** and six pages: General,
-Mage Macro, Compatibility, Chat, Spacers and Anchors.
+**Calm UI Tweaks**, containing **Calm's Tweaks** and four pages: General,
+Macro, Chat and Spacers.
 
 Settings belong to this addon rather than EUI profiles or conditional overrides.
 Unavailable or rejected plugin APIs disable options and report a status reason;
@@ -20,10 +20,9 @@ using a fresh `EllesmereUI.BlankRowCfg()` for that slot. Hidden search builds us
 and page restoration refresh cached labels in place. Native widget refreshes run
 only when this plugin's module is active, without rebuilding pages or refreshing
 another module. Module lookup and native refresh errors use the shared options
-boundary. General contains quest sparkle and LFG controls in one full row,
-then the cursor fix in the final row with a fresh blank right slot, with cached
-live status for all three. Macro and compatibility controls
-appear only on their dedicated pages.
+boundary. General contains quest sparkle and LFG controls in one full row, then
+the cursor fix with a fresh blank right slot, then a BAG UPGRADE ARROWS section,
+with cached live status throughout. Macro controls appear only on Macro.
 Module and page errors are isolated and clear when the failing operation
 recovers. Repeated reports are deduplicated until recovery; a later recurrence
 reports again.
@@ -32,8 +31,8 @@ reports again.
 
 | Store | Contents |
 | --- | --- |
-| `CalmUITweaksDB` | Account preferences, saved chat default, spacer geometry (`spacerLayouts`) and sparkle/cursor console-variable restoration records. |
-| `CalmUITweaksCharDB` | Macro ownership, chat apply records and corner baselines tied to native EUI anchors. |
+| `CalmUITweaksDB` | Account preferences, general-macro ownership, saved chat default, spacer geometry (`spacerLayouts`) and sparkle/cursor console-variable restoration records. |
+| `CalmUITweaksCharDB` | Character-macro ownership and chat apply records. Initialization removes retired character roots after the legacy spacer import; other keys remain. |
 | EUI layout | Native anchor and size-match links, including offsets and growth pins. |
 
 Raw SavedVariables are validated and migrated on this addon's `ADDON_LOADED`,
@@ -52,30 +51,35 @@ The source/package validator enforces ASCII and the source validator enforces
 the update-handler/ticker restriction.
 
 Legacy character spacer layouts seed missing account layouts with a deep copy
-on initialization. Existing account layouts take precedence; obsolete character
-spacer storage is removed after migration. The first loaded legacy character
-with geometry for a slot supplies that slot's account layout.
+on initialization. Existing account layouts take precedence. Retired character
+storage, including per-character spacer layouts and corner baselines, is removed
+after the import. The first loaded legacy character with geometry for a slot
+supplies that slot's account layout.
 
 The once-only `OnLogin` module callback runs after settings/readiness initialize,
 before settings application. Late initial addon loading uses the same callback.
 
-Preference reset restores defaults while retaining the chat default, spacer geometry and
-character records. It disables spacers and automatic chat updates, preserves
-macros and existing non-spacer anchor offsets, and lets native spacer removal
-clean up links.
+Preference reset restores defaults while retaining the chat default, spacer
+geometry and character records. It disables spacers and automatic chat updates,
+preserves macros, and lets native spacer removal clean up their links.
 
 ### Versioned SavedVariables
 
 The [SavedVariables contract](specs/saved-variables/PRODUCT.md) and
 [implementation/authoring guide](specs/saved-variables/TECH.md) define upgrades.
 `CalmUITweaksDB.schemaVersion` is the last completed account migration; the code
-currently requires version 3. Missing canonical metadata adopts only recognized
+currently requires version 4. Missing canonical metadata adopts only recognized
 legacy `cvarVersion` 0/1, otherwise starts at 0. Step 1 retains gathering cleanup;
-step 2 removes recognized obsolete account markers and migrates shared anchor gaps.
-Step 3 adds the default-off cursor fix preference without native writes and preserves
-any existing subtree. Steps checkpoint in order only after success.
-Pure-data failures discard tentative
-changes; native cleanup retains unresolved ownership for retry.
+step 2 removes recognized obsolete account markers and migrates shared anchor
+gaps (step 4 later retires that subtree). Step 3 adds the default-off cursor fix
+preference without native writes and preserves any existing subtree. Step 4 is
+the 1.0 cleanup: it removes recognized retired account roots such as
+`gatheringSparkles`, `whatsTraining`, `anchorGap`, `spacerCorners` and legacy
+version markers. Unrecognized keys are preserved, so macro-provider settings and
+future preferences survive. Initialization removes the retired character roots
+`spacers` and `spacerCorners` after the legacy spacer import; other character
+keys remain. Steps checkpoint in order only after success. Pure-data failures
+discard tentative changes; native cleanup retains unresolved ownership for retry.
 
 The checkpoint is outside preference defaults and survives reset. Unknown,
 malformed or conflicting metadata in either store is preserved and blocks startup.
@@ -84,7 +88,7 @@ introduced. While pending or blocked, feature initialization, setters and reset
 are unavailable, with native disabled-state feedback and status reasons.
 
 Existing saved data announces completed upgrades once after login, for example
-`savedvarsdb updated from "1" to "2"`; fresh/current accounts stay silent. On
+`savedvarsdb updated from "1" to "4"`; fresh/current accounts stay silent. On
 successful readiness, startup resumes once and releases migration subscriptions.
 The [CVar cleanup guide](specs/cvar-migrations/TECH.md) specializes this same runner;
 it is not a separate versioning system.
@@ -175,7 +179,8 @@ The existing module status/error boundary reports pending work and failures.
 ### Spacers
 
 - Four independent account switches, off by default, register native Unlock Mode
-  elements `CalmUITweaks_Spacer1` through `CalmUITweaks_Spacer4`.
+  elements `CalmUITweaks_Spacer1` through `CalmUITweaks_Spacer4`. They are plain
+  anchor elements; no corner alignment or automatic gap behavior remains.
 - Frames remain shown as transparent, noninteractive geometry. Initial size is
   24 by 24; native size controls accept dimensions from 1 to 2000.
 - Size and standalone position are account-wide. EUI owns attached placement,
@@ -184,48 +189,6 @@ The existing module status/error boundary reports pending work and failures.
   including combat-suspended sessions. Native open/close notifications retain
   session state even while the editor's visible-active query is false.
   Removal uses `UnregisterUnlockElement`, which also removes native links.
-
-### Player/Target corner alignment
-
-- Independent account choices are `DEFAULT`, `TOPLEFT`, `TOPRIGHT`,
-  `BOTTOMLEFT` and `BOTTOMRIGHT`; both default to `DEFAULT`.
-- Only EUI `player`/`target` links to enabled spacers are eligible. The native
-  side remains unchanged. Facing corners are documented in the README;
-  incompatible choices leave the link untouched.
-- LEFT/RIGHT links align height edges through `offsetY`; TOP/BOTTOM links align
-  width edges through `offsetX`. Dimensions use each frame's effective scale
-  relative to UIParent.
-- A new corner, side or link establishes alignment with zero separation.
-  Persisted side/corner/target baselines let later size changes preserve nudges.
-  `DEFAULT` releases management without undoing current offsets.
-- Size hooks and native placement/registration/profile notifications trigger
-  recalculation. Movement uses
-  `ReapplyOwnAnchor` and `PropagateAnchorChain`, skips combat, and restores its
-  baseline alongside native Discard.
-
-### Default anchor gaps
-
-- Automation defaults off. Each side defaults to 2 physical pixels and accepts
-  integers from 0 to 10. A legacy shared value fills missing side defaults.
-- Anchors groups Top/Bottom and Left/Right sliders in two full native rows.
-  Sliders are disabled while automation is off and retain their saved values.
-- During Unlock Mode, new link records with zero separation receive the selected
-  side's outward gap once. `PP.FromPixels` converts pixels to native coordinates.
-- TOP/BOTTOM affect only Y; LEFT/RIGHT affect only X. The alignment offset is
-  preserved. Native action/CDM corner presets are cardinal links with a separate
-  alignment offset, so they follow the same rule without diagonal displacement.
-- Growth pins on the separation axis receive the same delta. Alignment pins
-  remain unchanged; when a growth direction is recorded, inactive pin fields
-  also remain unchanged.
-- Existing links, nonzero separation offsets, center/diagonal sides, screen-edge
-  links and spacer links are excluded. A replaced anchor store is a layout load,
-  not a collection of new links. Defaults never change existing gaps.
-- Secure post-hooks on EUI's shared placement/reapply helpers notify changed
-  unlock keys. There is no frame watcher. Reapply and propagation use native EUI
-  APIs; queued mutations stop outside editing and defer through combat. Native
-  Save/Discard owns persistence. Session listeners remain authoritative during
-  combat suspension and lifecycle refreshes; a hidden editor does not end the
-  session or disable automation when editing resumes.
 
 ### Chat sharing
 
@@ -258,7 +221,7 @@ The existing module status/error boundary reports pending work and failures.
 - API failures can leave partial tab changes. Failed attempts retain the prior
   apply record so manual retry remains possible.
 
-### Macro and compatibility
+### Macros and bag upgrade arrows
 
 - Macro providers follow [the provider contract](specs/macro-providers/PRODUCT.md)
   and [the registration/addition guide](specs/macro-providers/TECH.md). New
@@ -269,23 +232,31 @@ The existing module status/error boundary reports pending work and failures.
   and localized spell names. Left-click uses food/water; right-click conjures via
   a cast sequence. Updates defer in combat. Unowned or manually changed macros
   are not overwritten; disable, rename and reset do not delete macros.
-- Mage Macro pairs its maintenance toggle with a native Rename Macro button.
-  The EUI input popup edits the account name preference through shared
-  validation, preserving existing macros and ownership. Rename is unavailable
-  before login and during combat. The current name and status refresh in place.
-- Compatibility shows live bag item-level status. Bag scope toggles are
-  disabled while bag item levels are off, preserving their saved choices.
-- On Compatibility, bag feature/scope controls require loaded EllesmereUIBags.
+- The druid providers maintain character macros for Rebirth in combat and Revive
+  out of combat, and for self-cast Thorns. Spell names are unranked so the client
+  uses the highest learned rank. Both Rebirth and Revive must be known.
+- The general provider maintains one account-wide general macro available to all
+  classes. Left-click eats the highest-rank conjured food in bags; right-click
+  drinks the highest-rank conjured water. `BAG_UPDATE_DELAYED` refreshes the body;
+  bank contents do not count and the last active character's bags win.
+- **Macro** pairs each provider's maintenance toggle with a native Rename button on
+  one page: General first, then class sections alphabetically. The EUI input
+  popup edits the account name preference through shared validation, preserving
+  existing macros and ownership. Rename is unavailable before login and during
+  combat. Current names and statuses refresh in place.
+- General's BAG UPGRADE ARROWS section shows live status. Scope toggles are
+  disabled while bag upgrade arrows are off, preserving their saved choices.
+- Bag feature/scope controls on General require loaded EllesmereUIBags.
   Native disabled states grey out unavailable controls with dependency tooltips,
   without altering preferences. Dependency checks use `C_AddOns.IsAddOnLoaded`,
   prefer its completed-load flag when present, and disable controls if the API is
   absent. Relevant addon loads refresh cached controls through the existing
   lifecycle, even when the patch preference is off. Unrelated loads do not
   refresh options.
-- Native bag item levels replace the former SimpleItemLevel bridge without
-  requiring SIL. The existing `simpleItemLevel` preference key and scope switches
-  remain intact. Equipment labels use Blizzard's detailed item level, quality
-  color, NumberFontNormal at top right, and an upgrade arrow at top left.
+- EUI keeps ownership of native bag item-level text and colors; this feature only
+  adds an upgrade arrow at the top right. It does not require SimpleItemLevel.
+  The existing `simpleItemLevel` preference key and inventory/reagent/bank scope
+  switches remain intact.
 - Comparisons use equipped item levels only, not stats or class usability.
   Rings/trinkets use the lower slot, one-handed weapons use main hand,
   two-handed weapons must beat both slots, and offhand items are excluded while
@@ -294,20 +265,21 @@ The existing module status/error boundary reports pending work and failures.
 - Grey/white candidates only receive arrows for empty matching slots, even if
   their item level exceeds equipped gear. Either paired ring/trinket slot may
   be empty; two-handed candidates require both weapon slots empty. The offhand
-  exclusion still applies. Green-or-better comparisons and all labels are unchanged.
+  exclusion still applies. Green-or-better comparisons are unchanged; no
+  item-level labels or quality filtering are added.
 - Bag opening, content events, equipment/level changes while visible and scope
   changes trigger coalesced updates. Level changes invalidate upgrade colors
   outside combat; hidden and disabled scopes have no level-up subscription.
-  Unchanged results and pending item callbacks are reused. Native texture, quality and refresh writes do no item queries.
+  Unchanged results and pending item callbacks are reused.
   Equipped item levels are cached per open/equipment refresh. Item-data events
   are subscribed only for pending equipped lookups; unrelated and duplicate
   completions do not schedule work. Failed loads wait for a later normal refresh.
   Pending-request bookkeeping expires when completion listeners stop, so reopening
   retries requests whose results could have been missed while all scopes were hidden.
   Hidden/disabled scopes do not scan or compare. Combat changes defer and
-  stale callbacks cannot repaint recycled buttons. Disable restores owned native
-  visibility without changing native text or SIL saved settings.
-- Compatibility fixes default on. Protected restoration waits through combat.
+  stale callbacks cannot repaint recycled buttons. Disable hides owned arrows
+  without changing native text or saved preferences.
+- Bag upgrade arrows default on. Protected changes wait through combat.
 
 Font assets and SharedMedia registration are outside this plugin. Packages
 must not contain font files; use a separate personal SharedMedia addon.
@@ -317,14 +289,14 @@ must not contain font files; use a separate personal SharedMedia addon.
 | Directory | Responsibility |
 | --- | --- |
 | `core/` | Settings, lifecycle, commands and module registry. |
-| `functions/` | Macro maintenance, chat, spacers and anchor behavior. |
+| `functions/` | Macro maintenance, bags, chat, LFG, spacers and console-variable features. |
 | `macros/` | Class-specific macro providers. |
 | `options/` | Native EUI plugin registration, pages and chat dialogs. |
 | `tests/` | Standalone Lua regression tests with mocked WoW/EUI APIs. |
 
-Anchor integration depends on EUI's private element registry, anchor records,
-placement hooks and native reapply APIs. These dependencies are outside the
-supported plugin contract; revalidate them when updating EUI.
+Spacer integration depends on EUI's private unlock-element registry, anchor
+records and native reapply APIs. These dependencies are outside the supported
+plugin contract; revalidate them when updating EUI.
 
 ## Verification
 
@@ -356,40 +328,41 @@ Before a release, verify on the installed Forever/EUI build:
 - [ ] Upgrade from saved gathering settings. Confirm there is no gathering
   toggle/search result/effect, still-owned targeting CVars restore, later external
   values survive, and pending cleanup survives combat/reload without polling.
-  Confirm quest loot sparkles remain independent and available.
-- [ ] Open all six pages, use search, check status and confirm settings survive
+  Confirm quest loot sparkles remain independent and available. Upgrade older
+  schema 3 data and confirm retired account and character roots are removed
+  while live preferences, unrecognized keys, chat default, spacer geometry and
+  macro ownership survive.
+- [ ] Open all four pages, use search, check status and confirm settings survive
   reload and remain independent of EUI profile changes. Check row packing at
   different UI scales and that saving/importing the first chat default enables
-  Apply Default and Export Default immediately. Confirm General contains only
-  sparkle/LFG controls and live status; macro and compatibility settings have
-  one home each. Change feature status while another EUI module is selected:
-  that page must remain untouched, and returning to the plugin must refresh its
-  cached controls and status. Check wrapped status text at different UI scales.
+  Apply Default and Export Default immediately. Confirm General contains the
+  sparkle, LFG, cursor fix and bag upgrade arrow controls with live status;
+  macro settings have one home. Change feature status while another EUI module
+  is selected: that page must remain untouched, and returning to the plugin must
+  refresh its cached controls and status. Check wrapped status text at different
+  UI scales.
 - [ ] Use Rename Macro, cancel once, confirm a valid name, and reject an invalid
   name. Check current name/status after page switching and reload. Toggle bag
-  item levels and anchor automation; dependent controls must refresh in place
-  and keep their saved values. Check rename availability through combat.
+  upgrade arrows and their scope switches; dependent controls must refresh in
+  place and keep their saved values. Check rename availability through combat.
 - [ ] With EllesmereUIBags absent/disabled, confirm its controls are greyed out
-  on Compatibility, dependency tooltips are clear, and saved preferences survive
+  on General, dependency tooltips are clear, and saved preferences survive
   reload. If loaded later, controls must refresh without rebuilding the page,
   including patches saved off.
 - [ ] Exercise all spacers, centered-bar chains, resizing, removal, Save/Discard,
-  facing corners, scales, manual nudges and combat transitions. Queue a spacer
-  enable/disable during editing, enter combat, and confirm the change waits
-  through automatic editor resumption until the edit session actually closes.
-- [ ] Create side and action/CDM corner links with asymmetric gaps, including zero.
-  Confirm outward-only spacing, growth alignment, reload and unchanged existing
-  links. Suspend editing through combat, trigger a relevant EUI addon load, then
-  resume and create a new link; automatic gaps must still apply.
+  scales and combat transitions. Queue a spacer enable/disable during editing,
+  enter combat, and confirm the change waits through automatic editor resumption
+  until the edit session actually closes.
 - [ ] Roundtrip chat exports and apply across characters with missing/extra tabs,
   unsupported groups, delayed channels and reserved voice windows. Confirm styling
   preservation and one-time automatic updates after chat becomes ready.
 - [ ] Check localized mage ranks, macro collisions, combat deferral, all bag/bank
   scopes and item loading.
-- [ ] With SimpleItemLevel disabled, compare bag-open CPU usage against the bag
-  item-level switch off, including idle open bags and equipment/non-equipment
-  loot. Check paired rings/trinkets, weapon rules, pending equipped data, native
-  label restoration, scope switches, reload and combat transitions. Close bags
-  during an equipped-item data request, reopen after a failed completion, and
-  check recovery. Level up with an above-level upgrade visible; its red arrow
+- [ ] Confirm EUI still shows native bag item levels and colors at every quality,
+  and that disabling the feature removes only owned arrows. Compare bag-open CPU
+  usage against the feature off, including idle open bags and
+  equipment/non-equipment loot. Check paired rings/trinkets, weapon rules,
+  pending equipped data, scope switches, reload and combat transitions. Close
+  bags during an equipped-item data request, reopen after a failed completion,
+  and check recovery. Level up with an above-level upgrade visible; its red arrow
   must clear when the item becomes usable.

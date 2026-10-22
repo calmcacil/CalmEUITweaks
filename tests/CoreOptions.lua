@@ -4,7 +4,7 @@ local addonName = "CalmEUITweaks"
 local root = "CalmEUITweaks/"
 local tests, passed, failed = {}, 0, 0
 local fileSets = {
-    ["Core.lua"] = { "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/Lifecycle.lua", "core/AnchorEvents.lua", "core/Commands.lua" },
+    ["Core.lua"] = { "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua", "core/Lifecycle.lua", "core/Commands.lua" },
     ["Options.lua"] = { "options/Chat.lua", "options/Pages.lua", "options/EllesmereUI.lua" },
 }
 
@@ -317,28 +317,32 @@ test("own ADDON_LOADED creates independent saved settings and ownership storage"
     s:storageUnchanged()
 end)
 
-test("default filling preserves false, unknown fields, and ownership records", function()
+test("default filling preserves false and unknown values while removing retired roots", function()
     local db = { version = 1, mageMacro = { enabled = false, name = 42, extra = "keep" },
         simpleItemLevel = { enabled = false, inventory = false, reagent = false, bank = "bad" },
-        unrelated = { keep = 17 } }
+        unrelated = { keep = 17 }, whatsTraining = { enabled = true }, anchorGap = { enabled = true } }
     local ownership = { name = "Owned", body = "/use water", marker = true }
-    local charDB = { version = 1, mageMacro = ownership, another = false }
+    local charDB = { version = 1, mageMacro = ownership, another = false,
+        spacerCorners = { player = { base = 1 } } }
     local s = core({ db = db, charDB = charDB }):initialize()
     equal(s.ns.db, db)
     equal(s.ns.charDB, charDB)
     equal(db.version, nil)
     equal(db.schemaVersion, s.ns.SCHEMA_VERSION)
     equal(db.mageMacro.enabled, false)
-    equal(db.mageMacro.name, "Mage FoodWater")
+    equal(db.mageMacro.name, "FoodWater")
     equal(db.mageMacro.extra, "keep")
     equal(db.simpleItemLevel.enabled, false)
     equal(db.simpleItemLevel.inventory, false)
     equal(db.simpleItemLevel.reagent, false)
     equal(db.simpleItemLevel.bank, true)
-    equal(db.unrelated.keep, 17)
+    equal(db.unrelated.keep, 17, "unrecognized account keys are preserved")
+    equal(db.whatsTraining, nil, "retired account roots are removed")
+    equal(db.anchorGap, nil, "retired anchor settings are removed")
     equal(charDB.version, 1)
     equal(charDB.mageMacro, ownership)
-    equal(charDB.another, false)
+    equal(charDB.another, false, "unrecognized character keys are preserved")
+    equal(charDB.spacerCorners, nil, "retired character roots are removed")
     s:storageUnchanged()
 end)
 
@@ -359,7 +363,17 @@ end)
 test("invalid persisted macro names revert to the default", function()
     for _, name in ipairs({ "", "   ", string.rep("x", 17), "bad|name", "bad\nname", false, {} }) do
         local s = core({ db = { mageMacro = { name = name } } }):initialize()
-        equal(s.ns.db.mageMacro.name, "Mage FoodWater")
+        equal(s.ns.db.mageMacro.name, "FoodWater")
+    end
+end)
+
+test("every macro name preference uses the shared validator", function()
+    for _, key in ipairs({ "druidRebirthMacro", "druidThornsMacro", "generalFoodWaterMacro" }) do
+        local s = core({ db = { [key] = { name = "bad|name" } } }):initialize()
+        equal(s.ns.db[key].name, s.ns.defaults[key].name)
+        equal(s.ns.SetSetting(key, "name", "  New Name  "), true)
+        equal(s.ns.db[key].name, "New Name")
+        equal(s.ns.SetSetting(key, "name", "bad|name"), false)
     end
 end)
 
@@ -500,8 +514,8 @@ end)
 
 test("cached macro name read and write failures are contained", function()
     local s = optionsFixture():initialize()
-    s:build("Mage Macro")
-    local nameLabel = s:findLabel("Macro name:")
+    s:build("Macro")
+    local nameLabel = s:findLabel("Mage macro name:")
     local getSettings = s.ns.GetSettings
     s.ns.GetSettings = function() error("cached getter failed") end
     s.ns.RefreshOptions()
@@ -583,7 +597,7 @@ end)
 
 test("reset restores only preferences and preserves ownership and host storage", function()
     local ownership = { name = "Owned", body = "existing", marker = "owned" }
-    local s = core({ db = { mageMacro = { enabled = false, name = "Custom" }, keep = { value = 3 } },
+    local s = core({ db = { mageMacro = { enabled = false, name = "Custom" } },
         charDB = { version = 1, mageMacro = ownership } }):initialize()
     local module = s:module("mageMacro")
     s:login()
@@ -594,10 +608,20 @@ test("reset restores only preferences and preserves ownership and host storage",
     equal(s.ns.charDB.mageMacro, ownership)
     same(s.ns.charDB, beforeChar)
     for key, value in pairs(s.ns.defaults) do same(s.ns.db[key], value) end
-    equal(s.ns.db.keep.value, 3)
     truth(s.ns.db.mageMacro ~= s.ns.defaults.mageMacro)
     equal(module.applied, 2)
     s:storageUnchanged()
+end)
+
+test("reset preserves account-scope macro ownership", function()
+    local records = { ["Food and Water"] = { lastGeneratedBody = "/use item:5349" } }
+    local s = core({ db = { generalFoodWaterMacro = {
+        enabled = false, name = "Custom", ownedMacros = records,
+    } } }):initialize()
+    s.ns.ResetSettings()
+    equal(s.ns.db.generalFoodWaterMacro.enabled, false)
+    equal(s.ns.db.generalFoodWaterMacro.name, "Food and Water")
+    same(s.ns.db.generalFoodWaterMacro.ownedMacros, records)
 end)
 
 test("reset disables chat automation while preserving the default and character receipt", function()
@@ -620,7 +644,7 @@ test("reset before PLAYER_LOGIN does not activate modules", function()
     local module = s:module("mageMacro")
     s.ns.SetSetting("mageMacro", "enabled", false)
     s.ns.ResetSettings()
-    equal(s.ns.db.mageMacro.enabled, true)
+    equal(s.ns.db.mageMacro.enabled, false)
     equal(module.applied, 0, "reset must respect the same login gate as setters")
     equal(s.ns.ready, nil)
 end)
@@ -636,21 +660,20 @@ test("spacer layouts migrate to account storage without replacing shared layouts
     truth(first.ns.db.spacerLayouts[1] ~= legacy[1], "migration must copy the layout")
     truth(first.ns.db.spacerLayouts[1].position ~= legacy[1].position, "migration must copy nested position")
     equal(first.ns.charDB.spacers, nil)
+    equal(first.ns.charDB.spacerCorners, nil, "retired character baselines are pruned")
+    equal(first.ns.db.spacerCorners, nil, "retired account alignment is pruned")
     equal(first.ns.charDB.chat, receipt)
-    equal(first.ns.charDB.spacerCorners, baseline)
     local second = core({ db = copy(first.ns.db),
         charDB = { spacers = { [1] = { width = 99, height = 99 } } } }):initialize()
     equal(second.ns.db.spacerLayouts[1].width, 63, "later characters must not overwrite account geometry")
     equal(second.ns.db.spacerLayouts[1].position.x, 44)
     equal(second.ns.db.spacers.spacer1, true)
-    equal(second.ns.db.spacerCorners.player, "TOPRIGHT")
     same(second.ns.charDB.chat, {})
-    same(second.ns.charDB.spacerCorners, {})
+    equal(second.ns.charDB.spacerCorners, nil)
     local layouts = second.ns.db.spacerLayouts
     second.ns.ResetSettings()
     equal(second.ns.db.spacerLayouts, layouts, "preference reset preserves shared geometry")
     equal(second.ns.db.spacers.spacer1, false)
-    equal(second.ns.db.spacerCorners.player, "DEFAULT")
 end)
 
 test("session login hook runs once after readiness and before settings apply", function()
@@ -737,7 +760,7 @@ test("slash reset requires confirmation and preserves character ownership", func
     equal(s.ns.db.mageMacro.enabled, false)
     contains(s.messages[#s.messages], "reset confirm")
     slash("reset confirm")
-    equal(s.ns.db.mageMacro.enabled, true)
+    equal(s.ns.db.mageMacro.enabled, false)
     same(s.ns.charDB, before)
     contains(s.messages[#s.messages], "ownership and existing macros are preserved")
 end)
@@ -993,7 +1016,10 @@ local function checkVisiblePages(s)
         ["Quest loot sparkles"] = { "questLootSparkles", "enabled" },
         ["LFG leader location"] = { "lfgLeaderLocation", "enabled" },
         ["Maintain character macro"] = { "mageMacro", "enabled" },
-        ["Enable bag / bank item levels"] = { "simpleItemLevel", "enabled" },
+        ["Rebirth / Revive"] = { "druidRebirthMacro", "enabled" },
+        ["Self Thorns"] = { "druidThornsMacro", "enabled" },
+        ["Maintain general macro"] = { "generalFoodWaterMacro", "enabled" },
+        ["Bag upgrade arrows"] = { "simpleItemLevel", "enabled" },
         ["Inventory bags"] = { "simpleItemLevel", "inventory" },
         ["Reagent bags"] = { "simpleItemLevel", "reagent" },
         ["Bank"] = { "simpleItemLevel", "bank" },
@@ -1002,7 +1028,6 @@ local function checkVisiblePages(s)
         ["Enable Spacer 2"] = { "spacers", "spacer2" },
         ["Enable Spacer 3"] = { "spacers", "spacer3" },
         ["Enable Spacer 4"] = { "spacers", "spacer4" },
-        ["Automatic anchor gap"] = { "anchorGap", "enabled" },
     }
     for _, row in ipairs(s.rows) do
         for _, cfg in ipairs({ row.left, row.right }) do
@@ -1016,29 +1041,6 @@ local function checkVisiblePages(s)
                 cfg.setValue(not value)
                 equal(cfg.getValue(), not value)
                 same(s.ns.db, expected, "widget must change only its own setting")
-                cfg.setValue(value)
-            elseif cfg.type == "slider" then
-                equal(cfg.noCapture, true)
-                local side = cfg.text:match("^(%a+) gap %(pixels%)$")
-                truth(side, "unexpected slider: " .. tostring(cfg.text))
-                side = side:lower()
-                truth(s.ns.defaults.anchorGap[side] ~= nil, "unknown gap side")
-                local value, expected = cfg.getValue(), copy(s.ns.db)
-                expected.anchorGap[side] = cfg.min
-                cfg.setValue(cfg.min)
-                equal(cfg.getValue(), cfg.min)
-                same(s.ns.db, expected, "slider must change only its gap preference")
-                cfg.setValue(value)
-            elseif cfg.type == "dropdown" then
-                equal(cfg.noCapture, true)
-                local unit = cfg.text:match("^(%a+) corner$")
-                truth(unit, "unexpected dropdown")
-                unit = unit:lower()
-                local value, expected = cfg.getValue(), copy(s.ns.db)
-                expected.spacerCorners[unit] = "TOPLEFT"
-                cfg.setValue("TOPLEFT")
-                equal(cfg.getValue(), "TOPLEFT")
-                same(s.ns.db, expected, "corner dropdown changes only its own preference")
                 cfg.setValue(value)
             elseif cfg.type == "button" then
                 equal(cfg.noCapture, true)
@@ -1054,12 +1056,13 @@ local function checkVisiblePages(s)
 end
 
 
-test("General owns only standalone tweaks and other settings have one home", function()
+test("General owns personal tweaks and bag upgrade arrows while other settings have one home", function()
     local s = optionsFixture():initialize():login()
     local expected = {
-        General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix" },
-        ["Mage Macro"] = { "Maintain character macro" },
-        Compatibility = { "Enable bag / bank item levels", "Inventory bags", "Reagent bags", "Bank" },
+        General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix",
+            "Bag upgrade arrows", "Inventory bags", "Reagent bags", "Bank" },
+        Macro = { "Maintain general macro", "Rebirth / Revive", "Self Thorns",
+            "Maintain character macro" },
     }
     local before = copy(s.ns.db)
     for page, labels in pairs(expected) do
@@ -1099,8 +1102,8 @@ end)
 test("options refresh only our active module and retain hidden status updates", function()
     local s = optionsFixture():initialize():login()
     local eui, calls = s.env.EllesmereUI, 0
-    s:build("Mage Macro")
-    local label = s:findLabel("Macro name:")
+    s:build("Macro")
+    local label = s:findLabel("Mage macro name:")
     eui.RefreshPage = function(self, force)
         equal(self, eui)
         equal(force, nil)
@@ -1114,7 +1117,7 @@ test("options refresh only our active module and retain hidden status updates", 
     s.ns.RefreshOptions()
     equal(calls, 0, "must not refresh without an active module")
     s.activeModule = "plugin:" .. addonName .. ":Tweaks"
-    s.pluginRegistration.modules[1].onPageCacheRestore("Mage Macro")
+    s.pluginRegistration.modules[1].onPageCacheRestore("Macro")
     equal(calls, 1, "restoring our cached page refreshes widgets")
     eui.GetPluginModuleKey = function() return nil end
     s.ns.RefreshOptions()
@@ -1206,7 +1209,7 @@ test("hidden search builders create no frames or labels and activate no modules"
     same(s.ns.charDB, charDB)
     equal(#s.timers, 0)
     s.env.EllesmereUI.IsSearchPrebuild = function() return false end
-    truth(s:build("Mage Macro") > 0)
+    truth(s:build("Macro") > 0)
     truth(#s.labels > 0)
     s:storageUnchanged()
 end)
@@ -1250,7 +1253,7 @@ test("public search helper takes precedence over stale private prebuilding state
     local eui = s.env.EllesmereUI
     eui._prebuilding = true
     eui.IsSearchPrebuild = function() return false end
-    truth(s:build("Mage Macro") > 0)
+    truth(s:build("Macro") > 0)
     truth(#s.labels > 0, "public false must allow visible custom text despite private true")
     equal(s.env.CalmUITweaksDB, nil)
     equal(s.env.CalmUITweaksCharDB, nil)
@@ -1260,13 +1263,13 @@ end)
 
 test("cached macro name follows settings changes without rebuilding", function()
     local s = optionsFixture():initialize()
-    s:build("Mage Macro")
-    local macroName = s:findLabel("Macro name:")
+    s:build("Macro")
+    local macroName = s:findLabel("Mage macro name:")
     equal(s.ns.SetSetting("mageMacro", "name", "Changed Name"), true)
-    equal(macroName.text, "Macro name: Changed Name\nStatus: " .. s.ns.GetStatus("mageMacro"))
+    equal(macroName.text, "Mage macro name: Changed Name\nStatus: " .. s.ns.GetStatus("mageMacro"))
     s.ns.db.mageMacro.name = "Restored Name"
     s.pluginRegistration.modules[1].onPageCacheRestore()
-    equal(macroName.text, "Macro name: Restored Name\nStatus: " .. s.ns.GetStatus("mageMacro"))
+    equal(macroName.text, "Mage macro name: Restored Name\nStatus: " .. s.ns.GetStatus("mageMacro"))
     s:storageUnchanged()
 end)
 
@@ -1275,9 +1278,14 @@ test("macro rename uses the native input popup and shared settings validation", 
     local eui = s.env.EllesmereUI
     local ownership = { Keep = { lastGeneratedBody = "owned" } }
     s.ns.charDB.mageMacro.ownedMacros = ownership
-    s:build("Mage Macro")
-    equal(#s.rows, 1)
-    local toggle, rename = s.rows[1].left, s.rows[1].right
+    s:build("Macro")
+    equal(#s.rows, 4)
+    local toggle, rename
+    for _, row in ipairs(s.rows) do
+        if row.left.type == "toggle" and row.left.text == "Maintain character macro" then
+            toggle, rename = row.left, row.right
+        end
+    end
     equal(toggle.type, "toggle")
     equal(rename.type, "button")
     equal(rename.text, "Rename Macro")
@@ -1293,13 +1301,13 @@ test("macro rename uses the native input popup and shared settings validation", 
         refreshes = refreshes + 1
     end
     rename.onClick()
-    equal(popup.initialText, "Mage FoodWater")
+    equal(popup.initialText, "FoodWater")
     equal(popup.maxLetters, 16)
     equal(popup.cancelText, "Cancel")
-    equal(s.ns.db.mageMacro.name, "Mage FoodWater", "opening or cancelling must not rename")
+    equal(s.ns.db.mageMacro.name, "FoodWater", "opening or cancelling must not rename")
     popup.onConfirm("  My FoodWater  ")
     equal(s.ns.db.mageMacro.name, "My FoodWater")
-    contains(s:findLabel("Macro name:").text, "Macro name: My FoodWater")
+    contains(s:findLabel("Mage macro name:").text, "Mage macro name: My FoodWater")
     contains(s.messages[#s.messages], "previous macros are left intact")
     equal(s.ns.charDB.mageMacro.ownedMacros, ownership)
     same(ownership, { Keep = { lastGeneratedBody = "owned" } })
@@ -1313,82 +1321,75 @@ test("macro rename uses the native input popup and shared settings validation", 
     s.combat = false
     s.ns.ready = false
     equal(rename.disabled(), true)
-    equal(#s.rows, 1, "rename uses the existing page cache")
+    equal(#s.rows, 4, "rename uses the existing page cache")
     s:storageUnchanged()
 end)
 
 test("macro and bag status follows updates and cached-page restoration", function()
     local s = optionsFixture():initialize():login()
     s.ns.SetStatus("simpleItemLevel", "Bag initial")
-    s:build("Mage Macro")
-    s:build("Compatibility")
-    local macro = s:findLabel("Macro name:")
-    local bags = s:findLabel("Status: Bag initial", true)
+    s:build("Macro")
+    s:build("General")
+    local macro = s:findLabel("Mage macro name:")
+    local bags = s:findLabel("Bag upgrade arrows: Bag initial", true)
     s.ns.SetStatus("mageMacro", "Waiting for localized spells.")
     s.ns.SetStatus("simpleItemLevel", "Waiting for EUI Bags.")
     contains(macro.text, "Status: Waiting for localized spells.")
-    equal(bags.text, "Status: Waiting for EUI Bags.")
+    equal(bags.text, "Bag upgrade arrows: Waiting for EUI Bags.")
     s.ns.statuses.mageMacro = "Ready"
-    s.pluginRegistration.modules[1].onPageCacheRestore("Mage Macro")
+    s.pluginRegistration.modules[1].onPageCacheRestore("Macro")
     contains(macro.text, "Status: Ready")
     s:storageUnchanged()
 end)
 
-test("dependent scopes and gap sliders refresh in place with their parent switch", function()
-    for _, config in ipairs({
-        { page = "Compatibility", key = "simpleItemLevel", kind = "toggle", count = 3 },
-        { page = "Anchors", key = "anchorGap", kind = "slider", count = 4 },
-    }) do
-        local s = optionsFixture():initialize():login()
-        s:build(config.page)
-        local states, dependent = {}, {}
-        local eui = s.env.EllesmereUI
-        local function Dependent(cfg)
-            if config.kind == "slider" then return cfg.type == "slider" end
-            return cfg.text == "Inventory bags" or cfg.text == "Reagent bags" or cfg.text == "Bank"
-        end
-        local function RefreshControls(self, force)
-            equal(self, eui)
-            equal(force, nil, "control changes must not rebuild the page")
-            for _, row in ipairs(s.rows) do
-                for _, cfg in ipairs({ row.left, row.right }) do
-                    if Dependent(cfg) then
-                        states[cfg] = cfg.disabled()
-                    end
-                end
-            end
-        end
-        eui.RefreshPage = RefreshControls
+test("dependent bag scopes refresh in place with their parent switch", function()
+    local s = optionsFixture():initialize():login()
+    s:build("General")
+    local states, dependent = {}, {}
+    local eui = s.env.EllesmereUI
+    local function Dependent(cfg)
+        return cfg.text == "Inventory bags" or cfg.text == "Reagent bags" or cfg.text == "Bank"
+    end
+    local function RefreshControls(self, force)
+        equal(self, eui)
+        equal(force, nil, "control changes must not rebuild the page")
         for _, row in ipairs(s.rows) do
             for _, cfg in ipairs({ row.left, row.right }) do
-                if Dependent(cfg) then dependent[#dependent + 1] = cfg end
+                if Dependent(cfg) then states[cfg] = cfg.disabled() end
             end
         end
-        equal(#dependent, config.count)
-        local parent = s.rows[1].left
-        local before, rows = copy(s.ns.db), #s.rows
-        parent.setValue(false)
-        for _, cfg in ipairs(dependent) do equal(states[cfg], true) end
-        parent.setValue(true)
-        for _, cfg in ipairs(dependent) do equal(states[cfg], false) end
-        s.ns.db[config.key].enabled = false
-        s.pluginRegistration.modules[1].onPageCacheRestore(config.page)
-        for _, cfg in ipairs(dependent) do equal(states[cfg], true) end
-        s.ns.db[config.key].enabled = before[config.key].enabled
-        same(s.ns.db, before, "enabling/disabling must preserve dependent preferences")
-        equal(#s.rows, rows)
-        s:storageUnchanged()
     end
+    eui.RefreshPage = RefreshControls
+    local parent
+    for _, row in ipairs(s.rows) do
+        for _, cfg in ipairs({ row.left, row.right }) do
+            if Dependent(cfg) then dependent[#dependent + 1] = cfg end
+            if cfg.text == "Bag upgrade arrows" then parent = cfg end
+        end
+    end
+    truth(parent, "bag master switch must be present")
+    equal(#dependent, 3)
+    local before, rows = copy(s.ns.db), #s.rows
+    parent.setValue(false)
+    for _, cfg in ipairs(dependent) do equal(states[cfg], true) end
+    parent.setValue(true)
+    for _, cfg in ipairs(dependent) do equal(states[cfg], false) end
+    s.ns.db.simpleItemLevel.enabled = false
+    s.pluginRegistration.modules[1].onPageCacheRestore("General")
+    for _, cfg in ipairs(dependent) do equal(states[cfg], true) end
+    s.ns.db.simpleItemLevel.enabled = before.simpleItemLevel.enabled
+    same(s.ns.db, before, "enabling/disabling must preserve dependent preferences")
+    equal(#s.rows, rows)
+    s:storageUnchanged()
 end)
 
-test("missing compatibility addons grey out their controls without changing preferences", function()
+test("missing bag addon greys out its controls without changing preferences", function()
     for _, loaded in ipairs({ {}, { EllesmereUIBags = true } }) do
         local s = optionsFixture({ loadedAddons = loaded }):initialize():login()
         local before, charBefore = copy(s.ns.db), copy(s.ns.charDB)
         s:build("General")
-        s:build("Compatibility")
         local dependencies = {
-            ["Enable bag / bank item levels"] = "EllesmereUIBags",
+            ["Bag upgrade arrows"] = "EllesmereUIBags",
             ["Inventory bags"] = "EllesmereUIBags",
             ["Reagent bags"] = "EllesmereUIBags",
             ["Bank"] = "EllesmereUIBags",
@@ -1403,7 +1404,7 @@ test("missing compatibility addons grey out their controls without changing pref
                     equal(cfg.getValue(), true, "greying a control must preserve its saved choice")
                     checked = checked + 1
                 elseif cfg.type == "toggle" then
-                    equal(cfg.disabled(), false, "missing compatibility addons must not disable unrelated features")
+                    equal(cfg.disabled(), false, "missing bag addon must not disable unrelated features")
                 end
             end
         end
@@ -1414,10 +1415,16 @@ test("missing compatibility addons grey out their controls without changing pref
     end
 end)
 
-test("compatibility controls wait for a completed load and a usable addon API", function()
+test("bag dependency controls wait for a completed load and a usable addon API", function()
     local s = optionsFixture():initialize():login()
-    s:build("Compatibility")
-    local bags = s.rows[1].left
+    s:build("General")
+    local bags
+    for _, row in ipairs(s.rows) do
+        for _, cfg in ipairs({ row.left, row.right }) do
+            if cfg.text == "Bag upgrade arrows" then bags = cfg end
+        end
+    end
+    truth(bags, "bag master switch must be present")
     s.env.C_AddOns.IsAddOnLoaded = function() return true, false end
     equal(bags.disabled(), true, "loading is not yet available")
     s.env.C_AddOns.IsAddOnLoaded = function() return true, true end
@@ -1428,12 +1435,11 @@ test("compatibility controls wait for a completed load and a usable addon API", 
     equal(bags.disabled(), true, "missing namespace leaves dependency controls disabled")
 end)
 
-test("late compatibility addon loads refresh cached controls even when the patch is off", function()
+test("late bag addon loads refresh cached controls even when the patch is off", function()
     local s = optionsFixture({ loadedAddons = {}, db = {
         simpleItemLevel = { enabled = false },
     } }):initialize():login()
     s:build("General")
-    s:build("Compatibility")
     local eui, states, calls = s.env.EllesmereUI, {}, 0
     eui.RefreshPage = function(self, force)
         equal(self, eui)
@@ -1451,12 +1457,12 @@ test("late compatibility addon loads refresh cached controls even when the patch
     s.loadedAddons.EllesmereUIBags = true
     s:event("ADDON_LOADED", "EllesmereUIBags")
     equal(calls, 1)
-    equal(states["Enable bag / bank item levels"], false)
+    equal(states["Bag upgrade arrows"], false)
     equal(states["Inventory bags"], true, "scopes remain disabled while their parent is off")
     s.loadedAddons.EllesmereUIBags = nil
-    s.pluginRegistration.modules[1].onPageCacheRestore("Compatibility")
+    s.pluginRegistration.modules[1].onPageCacheRestore("General")
     equal(calls, 2)
-    equal(states["Enable bag / bank item levels"], true, "cached pages recheck dependency availability")
+    equal(states["Bag upgrade arrows"], true, "cached pages recheck dependency availability")
     same(s.ns.db, before, "dependency loading never changes saved enabled states")
     equal(#s.rows, rowCount)
     s:storageUnchanged()
@@ -1465,7 +1471,7 @@ end)
 test("native widget refresh failures report, recover, and permit later refreshes", function()
     local s = optionsFixture():initialize():login()
     local eui = s.env.EllesmereUI
-    s:build("Mage Macro")
+    s:build("Macro")
     local calls = 0
     eui.RefreshPage = function(self, force)
         equal(self, eui)
@@ -1566,8 +1572,8 @@ end)
 
 test("page and cached-label recovery cannot clear each other's outstanding failures", function()
     local s = optionsFixture():initialize()
-    s:build("Mage Macro")
-    local label = s:findLabel("Macro name:")
+    s:build("Macro")
+    local label = s:findLabel("Mage macro name:")
     local setText = label.SetText
     label.SetText = function() error("label failed", 0) end
     s.ns.RefreshOptions()

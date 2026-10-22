@@ -90,7 +90,7 @@ local function Toggle(moduleKey, key, text, tooltip)
     }
 end
 
-local function CompatibilityToggle(key, text, tooltip)
+local function DependencyToggle(key, text, tooltip)
     local cfg = Toggle(key, "enabled", text, tooltip)
     cfg.disabled = function() return not DependencyLoaded(key) end
     cfg.disabledTooltip = "Requires " .. dependencies[key] .. " to be installed, enabled, and loaded."
@@ -139,6 +139,25 @@ local function BuildPage(page, parent, y)
         local _, height = widgets:Spacer(parent, y, 20)
         y = y - height
     end
+    local function RenameButton(moduleKey, title, text, tooltip)
+        return {
+            type = "button", text = text, noCapture = true, tooltip = tooltip,
+            disabled = function() return not ns.ready or InCombatLockdown() end,
+            disabledTooltip = "Available after login and outside combat.",
+            onClick = function()
+                eui:ShowInputPopup({
+                    title = title,
+                    message = "Choose a free macro name. Existing macros remain unchanged.",
+                    initialText = ns.GetSettings(moduleKey).name, maxLetters = 16,
+                    confirmText = "Rename Macro", cancelText = "Cancel",
+                    onConfirm = function(name)
+                        local ok, reason = ns.SetSetting(moduleKey, "name", name)
+                        ns.Print(ok and "Macro name changed; previous macros are left intact." or reason)
+                    end,
+                })
+            end,
+        }
+    end
 
     if page == "General" then
         Section("PERSONAL TWEAKS")
@@ -153,50 +172,62 @@ local function BuildPage(page, parent, y)
                 .. "\nLFG leader location: " .. ns.GetStatus("lfgLeaderLocation")
                 .. "\nCursor washed-out fix: " .. ns.GetStatus("cursorWashedOut")
         end, 80)
-    elseif page == "Mage Macro" then
-        Section("MAGE FOOD AND WATER")
-        Row(Toggle("mageMacro", "enabled", "Maintain character macro",
-            "Left-click uses food and water; right-click alternates conjure spells with a 10-second reset. Only owned macros are maintained; disabling leaves the macro intact."), {
-            type = "button", text = "Rename Macro", noCapture = true,
-            tooltip = "Choose the character macro name. Existing macros and manual edits are preserved. The name preference is account-wide.",
-            disabled = function() return not ns.ready or InCombatLockdown() end,
-            disabledTooltip = "Available after login and outside combat.",
-            onClick = function()
-                eui:ShowInputPopup({
-                    title = "Rename Mage Macro",
-                    message = "Choose a free macro name. Existing macros remain unchanged.",
-                    initialText = ns.GetSettings("mageMacro").name, maxLetters = 16,
-                    confirmText = "Rename Macro", cancelText = "Cancel",
-                    onConfirm = function(name)
-                        local ok, reason = ns.SetSetting("mageMacro", "name", name)
-                        ns.Print(ok and "Macro name changed; previous macros are left intact." or reason)
-                    end,
-                })
-            end,
-        })
-        Text(nil, function()
-            return "Macro name: " .. ns.GetSettings("mageMacro").name
-                .. "\nStatus: " .. ns.GetStatus("mageMacro")
-        end, 60)
-    elseif page == "Compatibility" then
-        Section("BAG ITEM LEVELS")
+        Spacer()
+        Section("BAG UPGRADE ARROWS")
         local function Scope(key, text, tooltip)
             local cfg = Toggle("simpleItemLevel", key, text, tooltip)
             cfg.disabled = function()
                 return not DependencyLoaded("simpleItemLevel") or not ns.GetSettings("simpleItemLevel").enabled
             end
-            cfg.disabledTooltip = "Requires loaded EllesmereUIBags and enabled bag / bank item levels."
+            cfg.disabledTooltip = "Requires loaded EllesmereUIBags and enabled bag upgrade arrows."
             return cfg
         end
-        Row(CompatibilityToggle("simpleItemLevel", "Enable bag / bank item levels",
-            "Requires EUI Bags. Arrows mark higher item level than equipped gear, not better class stats."),
+        Row(DependencyToggle("simpleItemLevel", "Bag upgrade arrows",
+            "Requires EUI Bags. Adds an up arrow when an item beats the equipped item level; red means the required level is not met. EUI keeps displaying item levels."),
             Scope("inventory", "Inventory bags",
-                "Show equipment item levels in normal inventory bags when bag item levels are enabled."))
+                "Show upgrade arrows in normal inventory bags when bag upgrade arrows are enabled."))
         Row(Scope("reagent", "Reagent bags",
-            "Show equipment item levels in reagent bags when bag item levels are enabled."),
+            "Show upgrade arrows in reagent bags when bag upgrade arrows are enabled."),
             Scope("bank", "Bank",
-                "Show equipment item levels in bank bags when bag item levels are enabled."))
-        Text(nil, function() return "Status: " .. ns.GetStatus("simpleItemLevel") end)
+                "Show upgrade arrows in bank bags when bag upgrade arrows are enabled."))
+        Text(nil, function() return "Bag upgrade arrows: " .. ns.GetStatus("simpleItemLevel") end)
+    elseif page == "Macro" then
+        -- General macros first, then class sections in alphabetical order.
+        Section("GENERAL")
+        Row(Toggle("generalFoodWaterMacro", "enabled", "Maintain general macro",
+            "Maintains a general (account-wide) macro. Left-click eats the highest-rank conjured food in your bags; right-click drinks the highest-rank conjured water. The macro updates when bag contents change."),
+            RenameButton("generalFoodWaterMacro", "Rename Food and Water", "Rename Macro",
+                "Choose the general macro name. The name and macro are shared by all characters."))
+        Text(nil, function()
+            return "General macro name: " .. ns.GetSettings("generalFoodWaterMacro").name
+                .. "\nStatus: " .. ns.GetStatus("generalFoodWaterMacro")
+        end, 60)
+        Spacer()
+        Section("DRUID")
+        Row(Toggle("druidRebirthMacro", "enabled", "Rebirth / Revive",
+            "Maintains a character macro that casts Rebirth in combat and Revive out of combat. The highest learned rank is used automatically. Only owned macros are maintained; disabling leaves the macro intact."),
+            RenameButton("druidRebirthMacro", "Rename Rebirth", "Rename Rebirth",
+                "Choose the Rebirth / Revive character macro name. The name preference is account-wide."))
+        Row(Toggle("druidThornsMacro", "enabled", "Self Thorns",
+            "Maintains a character macro that casts Thorns on yourself. The highest learned rank is used automatically. Only owned macros are maintained; disabling leaves the macro intact."),
+            RenameButton("druidThornsMacro", "Rename Thorns", "Rename Thorns",
+                "Choose the Thorns character macro name. The name preference is account-wide."))
+        Text(nil, function()
+            return "Rebirth / Revive: " .. ns.GetSettings("druidRebirthMacro").name
+                .. "\nStatus: " .. ns.GetStatus("druidRebirthMacro")
+                .. "\nThorns: " .. ns.GetSettings("druidThornsMacro").name
+                .. "\nStatus: " .. ns.GetStatus("druidThornsMacro")
+        end, 70)
+        Spacer()
+        Section("MAGE")
+        Row(Toggle("mageMacro", "enabled", "Maintain character macro",
+            "Left-click uses food and water; right-click alternates conjure spells with a 10-second reset. Only owned macros are maintained; disabling leaves the macro intact."),
+            RenameButton("mageMacro", "Rename FoodWater", "Rename Macro",
+                "Choose the character macro name. Existing macros and manual edits are preserved. The name preference is account-wide."))
+        Text(nil, function()
+            return "Mage macro name: " .. ns.GetSettings("mageMacro").name
+                .. "\nStatus: " .. ns.GetStatus("mageMacro")
+        end, 60)
     elseif page == "Chat" then
         local function Button(text, action, tooltip, needsDefault)
             return {
@@ -237,55 +268,6 @@ local function BuildPage(page, parent, y)
         Row(SpacerToggle(1), SpacerToggle(2))
         Row(SpacerToggle(3), SpacerToggle(4))
         Text("Resize and attach spacers in EUI Unlock Mode. Disabling removes their links; detach dependent frames first. Settings and sizes are account-wide.")
-        Spacer()
-        Section("PLAYER / TARGET CORNER ALIGNMENT")
-        local function Corner(unit, label)
-            return {
-                type = "dropdown", text = label .. " corner", noCapture = true,
-                values = { DEFAULT = "EUI Default", TOPLEFT = "Top Left", TOPRIGHT = "Top Right",
-                    BOTTOMLEFT = "Bottom Left", BOTTOMRIGHT = "Bottom Right" },
-                order = { "DEFAULT", "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" },
-                getValue = function() return ns.GetSettings("spacerCorners")[unit] end,
-                setValue = function(value) ns.SetSetting("spacerCorners", unit, value) end,
-                itemDisabled = function(value)
-                    local db = _G.EllesmereUIDB
-                    local info = db and db.unlockAnchors and db.unlockAnchors[unit]
-                    return type(info) == "table" and type(info.target) == "string"
-                        and info.target:match("^CalmUITweaks_Spacer[1-4]$")
-                        and not ns.IsSpacerCornerCompatible(info.side, value)
-                end,
-                itemDisabledTooltip = function()
-                    return "Choose a frame corner facing the spacer on the current anchor side."
-                end,
-                disabled = function()
-                    return not ns.ready or InCombatLockdown()
-                        or (type(eui.IsUnlockModeActive) == "function" and eui:IsUnlockModeActive())
-                end,
-                disabledTooltip = "Choose the alignment after finishing Unlock Mode, outside combat.",
-                tooltip = "Select the unit frame's corner facing the spacer. Keeps the native anchor side and makes the facing corners touch, resetting offsets on a new selection. Later size changes preserve manual nudges. EUI Default leaves the current link in place.",
-            }
-        end
-        Row(Corner("player", "Player"), Corner("target", "Target"))
-        Text("Choose the corner facing the spacer after saving its anchor. A new selection resets offsets; EUI Default keeps the current link.")
-    elseif page == "Anchors" then
-        Section("DEFAULT ANCHOR SPACING")
-        local function Gap(side, label)
-            return {
-                type = "slider", text = label .. " gap (pixels)", min = 0, max = 10, step = 1, noCapture = true,
-                getValue = function() return ns.GetSettings("anchorGap")[side] end,
-                setValue = function(value) ns.SetSetting("anchorGap", side, value) end,
-                disabled = function() return not ns.GetSettings("anchorGap").enabled end,
-                disabledTooltip = "Enable automatic anchor gap first.",
-                tooltip = "Spacing outside the target's " .. label:lower() .. " side, in physical pixels. Zero keeps new links flush. Applies to future anchors only.",
-            }
-        end
-        Row(Toggle("anchorGap", "enabled", "Automatic anchor gap",
-            "Adds the side's default gap once to newly created flush edge anchors in EUI Unlock Mode. Existing links and manual offsets are preserved. Defaults off."))
-        Spacer()
-        Section("DEFAULT GAPS")
-        Row(Gap("top", "Top"), Gap("bottom", "Bottom"))
-        Row(Gap("left", "Left"), Gap("right", "Right"))
-        Text("Applies to new flush edge links in EUI Unlock Mode. Existing offsets stay unchanged. Save keeps new gaps; Discard restores the layout.")
     end
     return math.abs(y) + 12
 end

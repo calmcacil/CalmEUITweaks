@@ -41,15 +41,6 @@ local function Harness()
     function methods:GetFrameLevel() return self.frameLevel or 1 end
     function methods:IsShown() return self.shown end
     function methods:IsVisible() return self.shown and (not self.parent or self.parent:IsVisible()) end
-    function methods:IsProtected()
-        if self.protectionError then error("Protection query unavailable") end
-        return not not self.protected
-    end
-    function methods:CanChangeProtectedState()
-        if self.changeError then error("Protected-state query unavailable") end
-        if self.cannotChange then return false end
-        return not h.combat or not self.protected
-    end
     function methods:SetParent(parent)
         Visual(self)
         if self.parent and self.isFrame then
@@ -91,9 +82,7 @@ local function Harness()
     function methods:SetItemButtonQuality() end
     function methods:CreateFontString()
         Visual(self)
-        local region = Object(self, false)
-        self.font = region
-        return region
+        return Object(self, false)
     end
     function methods:CreateTexture()
         Visual(self)
@@ -103,7 +92,7 @@ local function Harness()
     end
     for _, method in ipairs({
         "SetFrameLevel", "SetAllPoints", "SetSize", "SetAtlas", "ClearAllPoints", "SetPoint",
-        "SetFontObject", "SetText", "SetTextColor", "SetScale", "SetVertexColor",
+        "SetText", "SetVertexColor",
     }) do
         methods[method] = function(self, ...)
             Visual(self)
@@ -137,7 +126,6 @@ local function Harness()
         ItemGemSubclass = {Artifactrelic = 11}, BankType = {Character = 0, Account = 2},
         BagIndex = {AccountBankTab_1 = 13, AccountBankTab_5 = 17},
     }
-    env.NumberFontNormal, env.GameFontNormalLargeOutline = {}, {}
     env.UnitLevel = function() return 80 end
     env.C_Bank = {CanUseBank = function(bankType) return h.bankAccess[bankType] end}
     local function Key(bag, slot) return bag .. ":" .. slot end
@@ -171,10 +159,6 @@ local function Harness()
             if not item or item.missing then return end
             return "Item", nil, nil, nil, item.minimum or 1, nil, nil, nil, nil, nil,
                 nil, nil, nil, nil, nil, nil, item.reagent
-        end,
-        GetItemQualityColor = function(quality)
-            h.lastColorQuality = quality
-            return 1, 0.5, 0.2
         end,
     }
     env.Item = {CreateFromBagAndSlot = function(_, bag, slot)
@@ -275,11 +259,14 @@ local function NativeComparison()
     Equipped(h, 11, 201, 620, "INVTYPE_FINGER")
     Equipped(h, 12, 202, 590, "INVTYPE_FINGER")
     h:Start()
-    check(not head.ItemLevelText:IsShown(), "Native level replaces EUI label without SIL")
-    check(h:Overlay(head).font.calls.SetText[1] == 600, "Native item level rendered")
-    check(not h:Overlay(head).textureRegion:IsShown(), "Equal level is not an upgrade")
+    check(head.ItemLevelText:IsShown(), "Native item level stays visible")
+    check(not h:Overlay(head):IsShown() and not h:Overlay(head).textureRegion:IsShown(),
+        "Equal level shows no upgrade arrow")
     check(h:Overlay(ring).textureRegion:IsShown(), "Ring compares against lower equipped ring")
-    check(junk.ItemLevelText:IsShown() and #junk.children == 0, "Non-equipment keeps EUI display")
+    check(h:Overlay(ring).textureRegion.calls.SetPoint[1] == "TOPRIGHT",
+        "Upgrade arrow stays in the top-right corner")
+    check(junk.ItemLevelText:IsShown() and #junk.children == 0,
+        "Non-equipment keeps native display and gets no overlay")
     h.items[100].level = 610
     h.items[100].minimum = 90
     h.slots["0:1"].link = "item:100:b"
@@ -288,10 +275,12 @@ local function NativeComparison()
     check(h:Overlay(head).textureRegion.calls.SetVertexColor[2] == 0, "Above-level upgrade is red")
     Equipped(h, 1, 203, 650, "INVTYPE_HEAD")
     h:Draw("PLAYER_EQUIPMENT_CHANGED")
-    check(not h:Overlay(head).textureRegion:IsShown(), "Equipment change refreshes comparison")
+    check(head.ItemLevelText:IsShown() and not h:Overlay(head).textureRegion:IsShown(),
+        "Equipment change refreshes comparison without hiding native text")
     h.settings.enabled = false
     h:Apply()
-    check(head.ItemLevelText:IsShown() and not h:Overlay(head):IsShown(), "Disable restores owned native visibility")
+    check(head.ItemLevelText:IsShown() and not h:Overlay(head):IsShown(),
+        "Disable hides owned arrows and leaves native visibility")
     check(next(h.event.events) == nil, "Disable releases subscriptions")
 end
 
@@ -318,8 +307,8 @@ local function LowQualitySuggestions()
         h:Start()
         for _, button in ipairs({head, ring, trinket, two}) do
             check(not h:Overlay(button).textureRegion:IsShown(), "Grey/white gear cannot replace occupied slots")
-            check(h:Overlay(button).font:IsShown(), "Quality gate does not hide item levels")
         end
+        check(head.ItemLevelText:IsShown(), "Quality gate leaves native display alone")
         check(h:Overlay(off).textureRegion:IsShown(), "Grey/white offhand can fill a free slot")
         h.equipped[1], h.equipped[12], h.equipped[14], h.equipped[16] = nil, nil, nil, nil
         h:Draw("PLAYER_EQUIPMENT_CHANGED")
@@ -353,7 +342,6 @@ local function RefreshBudget()
         button:SetItemButtonTexture("same")
         button:SetItemButtonQuality()
         h.env.SetItemButtonQuality(button)
-        button.ItemLevelText:Show()
         root:RefreshInventory()
     end
     check(#h.timers == 0 and h.levelQueries == levels and h.containerQueries == containers,
@@ -367,7 +355,7 @@ local function RefreshBudget()
     h.items[301] = {level = 620}
     h.slots["0:1"] = {itemID = 301, quality = 4, link = "item:301:a"}
     h:Draw("BAG_UPDATE_DELAYED")
-    check(h:Overlay(button).font.calls.SetText[1] == 620, "Loot replacing a slot updates")
+    check(h:Overlay(button).textureRegion:IsShown(), "Loot replacing a slot updates")
     root:Hide(); h:Draw()
     check(not h.event.events.PLAYER_EQUIPMENT_CHANGED, "Hidden bags release equipment listener")
     root:Show(); h:Draw()
@@ -402,17 +390,20 @@ local function PendingAndRecycling()
     local stale = assert(table.remove(h.loads, 1))
     button:SetID(2); h:Put(0, 2, 402); h.items[402].level = 650
     h:Draw(); stale()
-    check(h:Overlay(button).font.calls.SetText[1] == 650 and h:Overlay(button):IsShown(), "Old load cannot clear recycled occupant")
+    check(h:Overlay(button).textureRegion:IsShown(), "Old load cannot clear recycled occupant")
     h.combat = true
     h.event:Fire("PLAYER_REGEN_DISABLED")
     button:SetID(3); h:Put(0, 3, 403)
     h:Draw()
-    check(not h:Overlay(button):IsShown() and h.combatViolations == 0, "Combat hides owned overlays without protected changes")
+    check(not h:Overlay(button):IsShown() and h.combatViolations == 0
+        and button.ItemLevelText:IsShown(),
+        "Combat hides the owned arrow without protected mutations")
     h.combat = false; h:Draw("PLAYER_REGEN_ENABLED")
     check(h:Overlay(button):IsShown(), "Deferred new occupant renders after combat")
     h.combat = true; h.settings.enabled = false; h.module:ApplySettings()
-    h.combat = false; h.event:Fire("PLAYER_REGEN_ENABLED")
-    check(button.ItemLevelText:IsShown() and next(h.event.events) == nil, "Combat disable restores native and releases listeners")
+    check(not h:Overlay(button):IsShown() and button.ItemLevelText:IsShown(),
+        "Combat disable hides owned arrows and leaves native visibility")
+    check(next(h.event.events) == nil, "Combat disable releases listeners")
 end
 
 local function HiddenEquippedFailure()
@@ -469,7 +460,8 @@ local function PlayerLevelChanges()
     local button = h:Button(root, 0, 1, 420)
     h.items[420].minimum = 81
     h:Start()
-    local arrow = h:Overlay(button).textureRegion
+    local overlay = h:Overlay(button)
+    local arrow = overlay.textureRegion
     check(arrow.calls.SetVertexColor[2] == 0, "Unavailable upgrade starts red")
     h.env.UnitLevel = function() return 81 end
     h:Draw("PLAYER_LEVEL_UP")
@@ -482,7 +474,8 @@ local function PlayerLevelChanges()
     h.combat = true
     h.env.UnitLevel = function() return 82 end
     h:Draw("PLAYER_LEVEL_UP")
-    check(h.combatViolations == 0 and not arrow:IsShown(), "Combat level-up defers protected work and hides stale color")
+    check(h.combatViolations == 0 and not overlay:IsShown() and button.ItemLevelText:IsShown(),
+        "Combat level-up defers work, hides the arrow, and leaves native text")
     h.combat = false; h:Draw("PLAYER_REGEN_ENABLED")
     check(arrow:IsShown() and arrow.calls.SetVertexColor[2] == 1, "Combat-end renders the usable upgrade")
     root:Hide(); h:Draw()
@@ -511,92 +504,48 @@ local function WeaponsAndScopes()
     local bank = h:Root("EUI_BankFrame")
     local item = h:Button(bank, 17, 1, 505)
     h:Draw("BANKFRAME_OPENED")
-    check(not item.ItemLevelText:IsShown(), "Accessible bank items display native levels")
+    local overlay = h:Overlay(item)
+    local arrow = overlay.textureRegion
+    check(item.ItemLevelText:IsShown() and arrow:IsShown(), "Accessible bank items show upgrade arrows")
     h.settings.bank = false; h:Apply()
-    check(item.ItemLevelText:IsShown(), "Disabled scope restores native")
+    check(item.ItemLevelText:IsShown() and not overlay:IsShown(), "Disabled bank scope hides only its arrow")
     h.settings.bank = true; h.bankAccess[2] = false; h:Apply()
-    check(item.ItemLevelText:IsShown(), "Inaccessible bank is left alone")
+    check(item.ItemLevelText:IsShown() and not overlay:IsShown(), "Inaccessible bank is left alone")
 end
 
-local function CombatSuppression()
+local function CombatDeferral()
     local h = Harness()
     h:Start()
     local root = h:Root("EUI_MainBagFrame", "RefreshInventory")
-    local a = h:Button(root, 0, 1, 300)
+    local button = h:Button(root, 0, 1, 300)
     h:Draw("BAG_UPDATE_DELAYED")
-    local overlay = h:Overlay(a)
-    check(overlay.font:IsShown() and overlay.textureRegion:IsShown(), "Both old visuals must be present before recycling")
+    local overlay = h:Overlay(button)
+    check(overlay.textureRegion:IsShown(), "Upgrade arrow renders before combat")
+    check(button.ItemLevelText:IsShown(), "Native item level is visible before combat")
+    h.module:ApplySettings()
+    h:Flush()
+    local stale = assert(table.remove(h.loads, 1), "Expected a pending item load")
     h.combat = true
-    a:SetID(2)
+    button:SetID(2)
     h:Put(0, 2, 301)
     h.items[301].level = 620
-    check(not overlay:IsShown() and not overlay.font:IsShown() and not overlay.textureRegion:IsShown(),
-        "Combat recycle must immediately suppress addon-owned level and upgrade")
-    check(not a.ItemLevelText:IsShown(), "Protected native restoration must remain deferred")
     h:Draw()
-    check(not overlay:IsShown(), "Stale callbacks must not repaint after combat invalidation")
-    check(h.ownCombatMutations > 0 and h.combatViolations == 0, "Only nonprotected own visuals may mutate in combat")
+    check(not overlay:IsShown() and not overlay.textureRegion:IsVisible(),
+        "Combat recycle hides the addon-owned arrow")
+    check(button.ItemLevelText:IsShown(), "Combat leaves native text visible")
+    check(h.combatViolations == 0, "Combat cleanup performs no protected mutations")
+    stale()
+    check(not overlay:IsShown() and not overlay.textureRegion:IsVisible(),
+        "Stale callbacks cannot repaint after combat cleanup")
+    check(button.ItemLevelText:IsShown(), "Stale callbacks leave native text visible")
     h.combat = false
     h:Draw("PLAYER_REGEN_ENABLED")
-    check(overlay:IsShown() and overlay.font.calls.SetText[1] == 620, "Regen must render only the new occupant")
-    overlay.protected = true
-    h.combat = true
-    h.slots["0:2"].link = "item:301:b"
-    h.event:Fire("BAG_UPDATE_DELAYED"); h:Flush()
-    check(overlay:IsShown() and not overlay.font:IsShown() and not overlay.textureRegion:IsShown(),
-        "Protected own frame must fall back to independently mutable owned regions")
-    check(h.combatViolations == 0, "Protected own frame Hide must not be attempted")
-    h.combat = false
-    h:Draw("PLAYER_REGEN_ENABLED")
-    overlay.font.protected, overlay.textureRegion.protected = true, true
-    h.combat = true
-    h.settings.enabled = false
-    h.module:ApplySettings()
-    check(overlay:IsShown() and overlay.font:IsShown() and overlay.textureRegion:IsShown(),
-        "Actually protected owned visuals must wait for regen, not attempt forbidden suppression")
-    check(h.combatViolations == 0 and h.module:GetStatus():find("pending combat"), "Protected fallback must keep cleanup registered")
-    h.combat = false
-    h.event:Fire("PLAYER_REGEN_ENABLED")
-    check(not overlay:IsShown() and a.ItemLevelText:IsShown(), "Protected fallback must complete at regen even while disabled")
-
-    for _, failure in ipairs({"protectionError", "changeError", "cannotChange", "missing"}) do
-        local guarded = Harness()
-        guarded:Start()
-        local main = guarded:Root("EUI_MainBagFrame")
-        local button = guarded:Button(main, 0, 1, 302)
-        guarded:Draw("BAG_UPDATE_DELAYED")
-        local own = guarded:Overlay(button)
-        for _, region in ipairs({own, own.font, own.textureRegion}) do
-            if failure == "missing" then region.IsProtected, region.CanChangeProtectedState = false, false
-            else region[failure] = true end
-        end
-        guarded.combat = true
-        button:SetID(2)
-        check(own:IsShown() and own.font:IsShown() and own.textureRegion:IsShown(),
-            "Unknown or denied protection state must defer: " .. failure)
-        check(guarded.combatViolations == 0 and guarded.ownCombatMutations == 0,
-            "Failed protection guards must not attempt visual operations: " .. failure)
-        guarded.combat = false
-        guarded.settings.enabled = false
-        guarded.module:ApplySettings()
-        check(not own:IsShown() and button.ItemLevelText:IsShown(), "Guard fallback must clean up outside combat: " .. failure)
-    end
-    for _, missing in ipairs({"IsProtected", "CanChangeProtectedState"}) do
-        local guarded = Harness()
-        guarded:Start()
-        local main = guarded:Root("EUI_MainBagFrame")
-        local button = guarded:Button(main, 0, 1, 303)
-        guarded:Draw("BAG_UPDATE_DELAYED")
-        local own = guarded:Overlay(button)
-        for _, region in ipairs({own, own.font, own.textureRegion}) do region[missing] = false end
-        guarded.combat = true
-        button:SetID(2)
-        check(not own:IsShown() and not own.font:IsShown() and not own.textureRegion:IsShown(),
-            "One available affirmative safety query must allow owned suppression: missing " .. missing)
-        check(guarded.combatViolations == 0 and not button.ItemLevelText:IsShown(),
-            "Single-query support must still leave native restoration deferred: missing " .. missing)
-    end
+    check(overlay:IsShown() and overlay.textureRegion:IsShown(),
+        "Combat end renders the current occupant")
+    check(overlay.textureRegion.calls.SetVertexColor[2] == 1,
+        "Combat-end arrow uses the current level color")
+    check(button.ItemLevelText:IsShown(), "Combat end leaves native text visible")
 end
 
-for _, suite in ipairs({NativeComparison, LowQualitySuggestions, RefreshBudget, PendingAndRecycling, HiddenEquippedFailure, PlayerLevelChanges, WeaponsAndScopes, CombatSuppression}) do suite() end
-print("PASS: Bag item levels (" .. assertions .. " assertions)")
+for _, suite in ipairs({NativeComparison, LowQualitySuggestions, RefreshBudget, PendingAndRecycling, HiddenEquippedFailure, PlayerLevelChanges, WeaponsAndScopes, CombatDeferral}) do suite() end
+print("PASS: Bag upgrade arrows (" .. assertions .. " assertions)")

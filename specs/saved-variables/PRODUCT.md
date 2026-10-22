@@ -16,9 +16,10 @@ character migration counter is deferred until a character schema change needs it
 ## Behavior
 
 1. `CalmUITweaksDB.schemaVersion` records the last completed account migration.
-   The code declares a target version. Missing means 0 for pre-versioned data;
-   equal versions require no migration, lower versions require ordered steps,
-   and newer, malformed or conflicting versions block use without repair or deletion.
+   The code declares a target version; the current target is 4, the 1.0 baseline.
+   Missing means 0 for pre-versioned data; equal versions require no migration,
+   lower versions require ordered steps, and newer, malformed or conflicting
+   versions block use without repair or deletion.
 
 2. Shipped `cvarVersion` values 0 and 1 are recognized only when adopting the old
    format. A missing `schemaVersion` adopts that completed checkpoint, not the
@@ -31,7 +32,11 @@ character migration counter is deferred until a character schema change needs it
    `version` and `cvarVersion` fields, and migrates the old shared anchor gap into
    missing side preferences. Existing side preferences take precedence.
    Step 3 adds the default-off cursor fix preference without native CVar writes,
-   preserving any existing cursor fix subtree.
+   preserving any existing cursor fix subtree. Step 4 is the 1.0 cleanup: it
+   removes a defined set of recognized retired account roots (`gatheringSparkles`,
+   `whatsTraining`, `anchorGap`, `spacerCorners` and legacy version markers).
+   Unrecognized keys are preserved, including macro-provider settings and future
+   preferences. It also drops subtrees owned by earlier retired-setting steps.
 
 4. Every outstanding step runs in order. Its checkpoint advances only on verified
    success. Failures stop the chain; later steps never run early. Reload resumes
@@ -55,14 +60,16 @@ character migration counter is deferred until a character schema change needs it
 
 8. Fresh installs initialize without an upgrade announcement. Existing nonempty
    saved data announces successful completion once after login, for example
-   `savedvarsdb updated from "1" to "2"`. The versions are schema versions, not
+   `savedvarsdb updated from "1" to "4"`. The versions are schema versions, not
    addon releases. Repeated events, reset and reload do not repeat the notice.
    Failed, pending and unsupported upgrades do not announce success.
 
 9. Recognized data keeps its enabled/disabled choices, unknown keys, chat default,
    spacer geometry, macro ownership and character receipts unless an explicit
-   migration changes that field. Defaults are applied only after migration.
-   Nested known fields can be repaired according to their existing contracts.
+   migration changes that field. Schema step 4 removes only the listed retired
+   roots; it does not remove unrecognized keys. Defaults are applied only after
+   migration. Nested known fields can be repaired according to their existing
+   contracts.
 
 10. A non-table saved root other than a missing root is preserved and blocked,
     not silently replaced. Unknown/malformed account schema metadata and unsupported
@@ -82,7 +89,9 @@ character migration counter is deferred until a character schema change needs it
 
 13. Existing per-character spacer import remains lazy: each character supplies
     missing account layouts on its own first compatible load, never overwriting
-    established account geometry. Current character ownership records stay local.
+    established account geometry. After the import, initialization removes the
+    retired `spacers` and `spacerCorners` roots; other character keys, including
+    macro-provider ownership, remain. Current character ownership records stay local.
 
 14. Historical steps remain append-only and available for direct upgrades from
     old releases. Changing a desired CVar policy first restores the full previous

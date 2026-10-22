@@ -11,11 +11,11 @@ be replaced, not retained as a second migration system.
 
 ## Proposed changes
 
-### One runner and three concrete steps
+### One runner and four concrete steps
 
 Use [core/Migrations.lua](../../core/Migrations.lua), registered as `migrations`
 through the existing module registry, in place of `LegacyCVars.lua`. Declare
-`ns.SCHEMA_VERSION = 3` and a contiguous `ns.schemaMigrations` table. Each entry is
+`ns.SCHEMA_VERSION = 4` and a contiguous `ns.schemaMigrations` table. Each entry is
 either a historical CVar cleanup descriptor (`settingsKey`, full old `values`,
 optional `retired`) or a pure-data `migrate(candidate)` function returning literal
 true on verified completion. Never silently treat a missing step as complete.
@@ -23,8 +23,15 @@ true on verified completion. Never silently treat a missing step as complete.
 - Step 1 preserves the old gathering names, applied values and restoration rules.
 - Step 2 removes recognized account `version`/`cvarVersion`, and performs the
   existing shared `anchorGap.pixels` migration before defaults obscure absence.
+  Step 4 later retires the whole anchor gap subtree.
 - Step 3 seeds a missing `cursorWashedOut` subtree with `enabled = false`,
   preserving existing values and making no native writes.
+- Step 4 is the 1.0 cleanup. It removes a defined set of recognized retired
+  account roots (`gatheringSparkles`, `whatsTraining`, `anchorGap`,
+  `spacerCorners` and legacy version markers). Unrecognized keys, including
+  macro-provider settings, are preserved. Character cleanup stays in
+  `InitializeSettings` after the legacy spacer import and removes only the
+  retired `spacers` and `spacerCorners` roots.
 
 The generic runner checkpoints after each successful entry. Pure-data callbacks
 receive a temporary deep copy using the existing copy helper; on true completion,
@@ -79,7 +86,7 @@ Capture the pre-default account's nonempty/fresh state and effective starting
 version once. Hold a completion notice until login and emit through `ns.Print`
 once, after successful full startup. Checkpoint persistence prevents replay on
 reload; the notice reports the current session's actual starting checkpoint.
-A 0.6.x account at `cvarVersion=1` becomes `schemaVersion=2` without rerunning step1.
+A 0.6.x account at `cvarVersion=1` becomes `schemaVersion=4` without rerunning step1.
 
 ### Adding future migrations
 
@@ -94,10 +101,14 @@ cannot certify unloaded characters.
 
 ## Testing and validation
 
-- Upgrade missing/0/1 CVar metadata, schema0/1/current, and fresh/empty databases;
-  prove no old targeting writes replay for a shipped cvarVersion1 account.
-- Exercise raw gap conversion before defaults, unknown fields, false preferences,
-  malformed nested fields, and existing per-character spacer import (product3,9,13).
+- Upgrade missing/0/1 CVar metadata, schema0/1/2/3/current, and fresh/empty
+  databases; prove no old targeting writes replay for a shipped cvarVersion1
+  account.
+- Exercise step 2 raw gap conversion for direct schema-2 upgrades, step 4
+  retirement of `anchorGap`, `spacerCorners`, `whatsTraining` and other listed
+  roots while unreserved keys survive, false preferences, malformed nested
+  fields, and existing per-character spacer import with character cleanup
+  (product3,9,13).
 - Block malformed/future/conflicting account and character metadata before any
   mutation, normalization, feature callback, setter or reset (product1,2,10,11).
 - Inject a pure-data failure after candidate mutation, then retry/reload; prove
@@ -107,11 +118,14 @@ cannot certify unloaded characters.
 - Integrate actual Lifecycle/Settings with dummy features and quest module: pending
   upgrades defer all feature callbacks; readiness resumes each once, late addon
   startup works, and queued stale callbacks are harmless (product6,12).
-- Capture chat: existing1->2 and pre-versioned0->2, fresh silence, failure silence,
-  partial retry, no reload/reset repetitions (product8).
+- Capture notices: existing3->4 and pre-versioned0->4, fresh silence, failure
+  silence, partial retry, no reload/reset repetitions (product8). Confirm live
+  preferences, chat default, spacer geometry, macro ownership and records survive
+  step 4.
 - Run `mise run check`, `git diff --check`, and a read-only safety review. In game,
-  back up SavedVariables, upgrade 0.6.1, inspect the notice and status, reload,
-  and exercise a combat-deferred upgrade. Mocks cannot prove native CVar effects.
+  back up SavedVariables, upgrade 0.6.1 and a schema 3 save, inspect the notice
+  and status, reload, and exercise a combat-deferred upgrade. Mocks cannot prove
+  native CVar effects.
 
 ## Parallelization
 

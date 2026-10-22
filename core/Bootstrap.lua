@@ -14,6 +14,10 @@ function ns.Print(message)
     print("|cffdca77fCalm UI Tweaks:|r " .. tostring(message))
 end
 
+function ns.IsEUIAddon(name)
+    return type(name) == "string" and name:match("^EllesmereUI") ~= nil
+end
+
 function ns.RegisterModule(key, module)
     assert(not ns.modules[key], "Duplicate Calm UI Tweaks module: " .. key)
     ns.modules[key] = module

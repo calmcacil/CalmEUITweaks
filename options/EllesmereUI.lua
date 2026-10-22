@@ -9,7 +9,7 @@ local function Install()
         key = moduleKey,
         title = "Calm's Tweaks",
         description = "Personal conveniences and third-party compatibility fixes.",
-        pages = { "General", "Mage Macro", "Compatibility", "Chat", "Spacers", "Anchors" },
+        pages = { "General", "Macro", "Chat", "Spacers" },
         buildPage = ns.BuildOptionsPage,
         onPageCacheRestore = ns.RefreshOptions,
     }

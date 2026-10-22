@@ -2,7 +2,7 @@ local _, ns = ...
 local module = { asyncErrors = true }
 ns.RegisterModule("migrations", module)
 
-ns.SCHEMA_VERSION = 3
+ns.SCHEMA_VERSION = 4
 -- Append steps and raise the target together; shipped definitions are immutable.
 ns.schemaMigrations = {
     [1] = {
@@ -38,6 +38,18 @@ ns.schemaMigrations = {
     [3] = {
         migrate = function(db)
             if db.cursorWashedOut == nil then db.cursorWashedOut = { enabled = false } end
+            return true
+        end,
+    },
+    -- Version 4 is the 1.0 baseline. Remove the saved roots of features retired
+    -- before 1.0, but keep unrecognized keys: macro providers and user data may
+    -- own them.
+    [4] = {
+        migrate = function(db)
+            for _, key in ipairs({ "gatheringSparkles", "whatsTraining", "anchorGap",
+                "spacerCorners", "version", "cvarVersion" }) do
+                db[key] = nil
+            end
             return true
         end,
     },
