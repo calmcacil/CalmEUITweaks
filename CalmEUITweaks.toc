@@ -6,7 +6,7 @@
 ## Version: 0.8.0
 # x-release-please-end
 ## RequiredDeps: EllesmereUI
-## OptionalDeps: WhatsTraining, EllesmereUIBags
+## OptionalDeps: EllesmereUIBags
 ## SavedVariables: CalmUITweaksDB
 ## SavedVariablesPerCharacter: CalmUITweaksCharDB
 
@@ -27,7 +27,6 @@ functions\BagItemLevel.lua
 functions\QuestLootSparkles.lua
 functions\CursorWashedOut.lua
 functions\LFGLeaderLocation.lua
-compatability\WhatsTraining.lua
 options\Chat.lua
 options\Pages.lua
 options\EllesmereUI.lua

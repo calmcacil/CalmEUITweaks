@@ -3,7 +3,6 @@ local _, ns = ...
 ns.defaults = {
     mageMacro = { enabled = true, name = "Mage FoodWater" },
     simpleItemLevel = { enabled = true, inventory = true, reagent = true, bank = true },
-    whatsTraining = { enabled = true },
     questLootSparkles = { enabled = false },
     cursorWashedOut = { enabled = false },
     lfgLeaderLocation = { enabled = false },

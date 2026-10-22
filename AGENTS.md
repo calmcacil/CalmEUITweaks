@@ -102,7 +102,6 @@ explicit user instruction, follow the user instruction.
 
 - `core/`: namespace, module registry, settings, lifecycle, and commands.
 - `functions/` and `macros/`: feature behavior and class macro providers.
-- `compatability/`: optional-addon bridges; keep the existing directory spelling.
 - `options/`: EUI plugin registration, pages, and dialogs.
 - `tests/`: mocked Lua regressions.
 - `scripts/` and `.github/`: validation, packaging, and releases.

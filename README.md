@@ -3,15 +3,13 @@
 A companion addon for [EllesmereUI](https://github.com/EllesmereGaming/EllesmereUI/)
 on WoW Forever. It adds spacer anchors, automatic anchor gaps, shared chat
 setups, a mage food/water macro, bag item levels and potential upgrade markers,
-quest-object sparkles, LFG leader locations, and a compatibility fix for
-WhatsTraining.
+quest-object sparkles and LFG leader locations.
 
 ## Requirements and installation
 
 - WoW Forever, interface version `16001`. Other clients have not been validated.
 - EllesmereUI with plugin API version 1 or later.
-- Optional: WhatsTraining for the spellbook theme and EllesmereUIBags for bag
-  item levels.
+- Optional: EllesmereUIBags for bag item levels.
 
 Place the files in `Interface/AddOns/CalmEUITweaks/`, with `CalmEUITweaks.toc`
 directly inside that folder. Rename a GitHub download's extracted folder if
@@ -20,7 +18,7 @@ necessary. Restart the client after installation.
 Open `/calmtweaks`, or select **Calm UI Tweaks > Calm's Tweaks** in EUI.
 The pages are General, Mage Macro, Compatibility, Chat, Spacers and Anchors.
 General contains the sparkle, LFG and cursor fix toggles with live feature status. Configure
-macro maintenance on Mage Macro and bag/training features on Compatibility.
+macro maintenance on Mage Macro and bag item levels on Compatibility.
 Use `/calmtweaks status` to check dependencies and errors.
 
 ## Features and defaults
@@ -29,7 +27,6 @@ Use `/calmtweaks status` to check dependencies and errors.
 | --- | --- | --- |
 | Mage macro | Enabled | Maintains a character macro using supported known food/water ranks. |
 | Bag item levels | Enabled for all scopes | Displays equipment item levels and potential upgrade arrows in EUI inventory, reagent bags and bank. |
-| WhatsTraining fix | Enabled | Themes the training tab to match EUI's spellbook, including backgrounds, fonts and controls. |
 | Quest loot sparkles | Off | Enables native quest-object sparkles with normal and raid outlines disabled. |
 | LFG leader location | Off | Shows the leader's current zone beside each LFG activity. |
 | Cursor washed-out fix | Off | Disables the hardware cursor to work around washed-out cursor colors. |
@@ -51,8 +48,6 @@ changes refresh comparisons while bags are visible. Repeated native texture,
 quality and refresh calls do no item queries. Equipped item-data notifications
 are subscribed only while a requested lookup is pending in a visible scope;
 reopening bags retries requests whose completion could have been missed.
-Training theme passes skip the hidden spellbook and unchanged native font writes;
-showing the spellbook applies pending theme changes.
 
 ## LFG leader location
 
@@ -236,40 +231,10 @@ For new macro additions, follow the [provider contract](specs/macro-providers/PR
 and [registration checklist](specs/macro-providers/TECH.md), starting from
 [`docs/templates/MacroProvider.lua`](docs/templates/MacroProvider.lua).
 
-The **Compatibility** page controls bag/bank item-level scopes and
-WhatsTraining theme fix, with live status for each feature. Bag scope controls
-are disabled while bag item levels are off and retain your choices. Bag controls
-are greyed out until EllesmereUIBags is loaded, and the training toggle is greyed
-out until WhatsTraining is loaded.
-Tooltips identify the required addon; saved preferences remain unchanged.
-The training tab inherits the native spellbook's backdrop and dim page artwork,
-so EUI and Modern skins keep their exact
-background, color and opacity. Its separate page coverings are suppressed,
-and native spells and controls beneath the tab are suppressed only while it is
-open. Switching back immediately restores the native content.
-The training tab matches the category tabs' dark selected fill and accent line.
-Its book icon uses the native category icon size and clipping mask. The return
-tab stays unselected and copies the current category icon. Native silver/gold
-tab frames stay suppressed when the spellbook rebuilds its tabs.
-
-Training text and inline colors follow the spellbook's text color. Headers use
-EUI's Blizzard Skin font, outline and shadow settings. Spell names and ranks
-copy the native spellbook's font faces and shadows while retaining ledger text
-sizes; input and control fonts stay native. Compact spell rows use thin dark
-icon edges. Larger tiles use the native spellbook's dimmed ring artwork when
-it fits, and headings have no icon decoration. Paging uses EUI's image arrows;
-small dropdown buttons retain native artwork and interaction. Thin dividers,
-window accent settings and a compact class/weapon toggle complete the theme.
-Skin and accent changes refresh the tab live; EUI may request a reload for
-font changes. Hover effects preserve the native animation's completion without
-reapplying the entire theme each frame. Native row text/color updates refresh
-only their changed labels, and unchanged fonts/layouts are cached. Available, next-level,
-unavailable and muted text retain
-WhatsTraining's status tones. Before the spellbook loads, text uses EUI's white
-default. Disabling the fix or spellbook skin restores owned visual changes.
-If restoration fails, status shows an error and the addon retains pending
-restoration records. After resolving the cause, turn the fix on and off to retry,
-or leave it off and reload the UI.
+The **Compatibility** page controls bag and bank item-level scopes, with live
+status. Bag scope controls are disabled while bag item levels are off and retain
+your choices. They are greyed out until EllesmereUIBags is loaded. Tooltips
+identify the required addon; saved preferences remain unchanged.
 
 Bag item levels use Blizzard's native item API and do not require SimpleItemLevel.
 Labels show equipment item levels in the top right; potential upgrade arrows

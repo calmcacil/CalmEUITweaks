@@ -74,7 +74,7 @@ local function sandbox(options)
     options = options or {}
     local s = { ns = {}, frames = {}, labels = {}, rows = {}, sections = {}, timers = {},
         messages = {}, errors = {}, combat = false, loggedIn = false }
-    s.loadedAddons = copy(options.loadedAddons or { EllesmereUIBags = true, WhatsTraining = true })
+    s.loadedAddons = copy(options.loadedAddons or { EllesmereUIBags = true })
     local env = setmetatable({}, { __index = _G })
     s.env = env
     s.ns.Chat = { GetSummary = function() return "Default saved: Not saved\nApplied to this character: Never\nNot applied" end }
@@ -320,7 +320,7 @@ end)
 test("default filling preserves false, unknown fields, and ownership records", function()
     local db = { version = 1, mageMacro = { enabled = false, name = 42, extra = "keep" },
         simpleItemLevel = { enabled = false, inventory = false, reagent = false, bank = "bad" },
-        whatsTraining = { enabled = false }, unrelated = { keep = 17 } }
+        unrelated = { keep = 17 } }
     local ownership = { name = "Owned", body = "/use water", marker = true }
     local charDB = { version = 1, mageMacro = ownership, another = false }
     local s = core({ db = db, charDB = charDB }):initialize()
@@ -335,7 +335,6 @@ test("default filling preserves false, unknown fields, and ownership records", f
     equal(db.simpleItemLevel.inventory, false)
     equal(db.simpleItemLevel.reagent, false)
     equal(db.simpleItemLevel.bank, true)
-    equal(db.whatsTraining.enabled, false)
     equal(db.unrelated.keep, 17)
     equal(charDB.version, 1)
     equal(charDB.mageMacro, ownership)
@@ -351,7 +350,7 @@ test("malformed roots are preserved while recognized nested settings are repaire
         equal(s.env.CalmUITweaksCharDB, value)
         truth(s.ns.settingsError, "Malformed roots require an explicit recovery decision")
     end
-    local s = core({ db = { mageMacro = false, simpleItemLevel = "bad", whatsTraining = 1 },
+    local s = core({ db = { mageMacro = false, simpleItemLevel = "bad" },
         charDB = { mageMacro = "bad" } }):initialize()
     same(s.ns.db, initializedDefaults(s))
     same(s.ns.charDB.mageMacro, {})
@@ -387,15 +386,15 @@ end)
 test("login applies registered modules in registration order", function()
     local s = core()
     local calls = {}
-    for _, key in ipairs({ "mageMacro", "simpleItemLevel", "whatsTraining" }) do
+    for _, key in ipairs({ "mageMacro", "simpleItemLevel" }) do
         s.ns.RegisterModule(key, {
             Initialize = function() calls[#calls + 1] = "init:" .. key end,
             ApplySettings = function() calls[#calls + 1] = "apply:" .. key end,
         })
     end
     s:initialize():login()
-    same(calls, { "init:mageMacro", "init:simpleItemLevel", "init:whatsTraining",
-        "apply:mageMacro", "apply:simpleItemLevel", "apply:whatsTraining" })
+    same(calls, { "init:mageMacro", "init:simpleItemLevel",
+        "apply:mageMacro", "apply:simpleItemLevel" })
 end)
 
 
@@ -998,7 +997,6 @@ local function checkVisiblePages(s)
         ["Inventory bags"] = { "simpleItemLevel", "inventory" },
         ["Reagent bags"] = { "simpleItemLevel", "reagent" },
         ["Bank"] = { "simpleItemLevel", "bank" },
-        ["Match spellbook theme"] = { "whatsTraining", "enabled" },
         ["Auto Apply Updated Default"] = { "chat", "autoApply" },
         ["Enable Spacer 1"] = { "spacers", "spacer1" },
         ["Enable Spacer 2"] = { "spacers", "spacer2" },
@@ -1061,7 +1059,7 @@ test("General owns only standalone tweaks and other settings have one home", fun
     local expected = {
         General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix" },
         ["Mage Macro"] = { "Maintain character macro" },
-        Compatibility = { "Enable bag / bank item levels", "Inventory bags", "Reagent bags", "Bank", "Match spellbook theme" },
+        Compatibility = { "Enable bag / bank item levels", "Inventory bags", "Reagent bags", "Bank" },
     }
     local before = copy(s.ns.db)
     for page, labels in pairs(expected) do
@@ -1197,7 +1195,7 @@ end)
 
 test("hidden search builders create no frames or labels and activate no modules", function()
     local s = optionsFixture():initialize()
-    local modules = { s:module("mageMacro"), s:module("simpleItemLevel"), s:module("whatsTraining") }
+    local modules = { s:module("mageMacro"), s:module("simpleItemLevel") }
     s.env.EllesmereUI.IsSearchPrebuild = function() return true end
     local frames, db, charDB = #s.frames, copy(s.ns.db), copy(s.ns.charDB)
     for _, page in ipairs(s.pluginRegistration.modules[1].pages) do s:build(page) end
@@ -1223,7 +1221,7 @@ test("public search prebuild API suppresses custom frames without private prebui
         searchCalls = searchCalls + 1
         return true
     end
-    local modules = { s:module("mageMacro"), s:module("simpleItemLevel"), s:module("whatsTraining") }
+    local modules = { s:module("mageMacro"), s:module("simpleItemLevel") }
     local defaults, frames = copy(s.ns.defaults), #s.frames
     local function buildAll()
         for _, page in ipairs(s.pluginRegistration.modules[1].pages) do truth(s:build(page) > 0) end
@@ -1319,21 +1317,17 @@ test("macro rename uses the native input popup and shared settings validation", 
     s:storageUnchanged()
 end)
 
-test("macro and compatibility status follows updates and cached-page restoration", function()
+test("macro and bag status follows updates and cached-page restoration", function()
     local s = optionsFixture():initialize():login()
     s.ns.SetStatus("simpleItemLevel", "Bag initial")
-    s.ns.SetStatus("whatsTraining", "Training initial")
     s:build("Mage Macro")
     s:build("Compatibility")
     local macro = s:findLabel("Macro name:")
     local bags = s:findLabel("Status: Bag initial", true)
-    local training = s:findLabel("Status: Training initial", true)
     s.ns.SetStatus("mageMacro", "Waiting for localized spells.")
     s.ns.SetStatus("simpleItemLevel", "Waiting for EUI Bags.")
-    s.ns.SetStatus("whatsTraining", "Waiting for WhatsTraining.")
     contains(macro.text, "Status: Waiting for localized spells.")
     equal(bags.text, "Status: Waiting for EUI Bags.")
-    equal(training.text, "Status: Waiting for WhatsTraining.")
     s.ns.statuses.mageMacro = "Ready"
     s.pluginRegistration.modules[1].onPageCacheRestore("Mage Macro")
     contains(macro.text, "Status: Ready")
@@ -1388,8 +1382,7 @@ test("dependent scopes and gap sliders refresh in place with their parent switch
 end)
 
 test("missing compatibility addons grey out their controls without changing preferences", function()
-    for _, loaded in ipairs({ {}, { EllesmereUIBags = true }, { WhatsTraining = true },
-        { EllesmereUIBags = true, WhatsTraining = true } }) do
+    for _, loaded in ipairs({ {}, { EllesmereUIBags = true } }) do
         local s = optionsFixture({ loadedAddons = loaded }):initialize():login()
         local before, charBefore = copy(s.ns.db), copy(s.ns.charDB)
         s:build("General")
@@ -1399,7 +1392,6 @@ test("missing compatibility addons grey out their controls without changing pref
             ["Inventory bags"] = "EllesmereUIBags",
             ["Reagent bags"] = "EllesmereUIBags",
             ["Bank"] = "EllesmereUIBags",
-            ["Match spellbook theme"] = "WhatsTraining",
         }
         local checked = 0
         for _, row in ipairs(s.rows) do
@@ -1415,7 +1407,7 @@ test("missing compatibility addons grey out their controls without changing pref
                 end
             end
         end
-        equal(checked, 5)
+        equal(checked, 4)
         same(s.ns.db, before)
         same(s.ns.charDB, charBefore)
         s:storageUnchanged()
@@ -1438,7 +1430,7 @@ end)
 
 test("late compatibility addon loads refresh cached controls even when the patch is off", function()
     local s = optionsFixture({ loadedAddons = {}, db = {
-        simpleItemLevel = { enabled = false }, whatsTraining = { enabled = false },
+        simpleItemLevel = { enabled = false },
     } }):initialize():login()
     s:build("General")
     s:build("Compatibility")
@@ -1461,14 +1453,10 @@ test("late compatibility addon loads refresh cached controls even when the patch
     equal(calls, 1)
     equal(states["Enable bag / bank item levels"], false)
     equal(states["Inventory bags"], true, "scopes remain disabled while their parent is off")
-    equal(states["Match spellbook theme"], true)
-    s.loadedAddons.WhatsTraining = true
-    s:event("ADDON_LOADED", "WhatsTraining")
-    equal(calls, 2)
-    equal(states["Match spellbook theme"], false)
-    s.loadedAddons.WhatsTraining = nil
+    s.loadedAddons.EllesmereUIBags = nil
     s.pluginRegistration.modules[1].onPageCacheRestore("Compatibility")
-    equal(states["Match spellbook theme"], true, "cached pages recheck dependency availability")
+    equal(calls, 2)
+    equal(states["Enable bag / bank item levels"], true, "cached pages recheck dependency availability")
     same(s.ns.db, before, "dependency loading never changes saved enabled states")
     equal(#s.rows, rowCount)
     s:storageUnchanged()
