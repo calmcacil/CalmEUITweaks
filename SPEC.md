@@ -227,18 +227,22 @@ The existing module status/error boundary reports pending work and failures.
   and [the registration/addition guide](specs/macro-providers/TECH.md). New
   providers supply metadata and text generation only; shared maintenance owns
   lifecycle, spell-data requests, combat deferral, verified writes and ownership.
-  Use the development template in `docs/templates/MacroProvider.lua`.
-- The mage provider maintains a character macro using supported known rank tiers
-  and localized spell names. Left-click uses food/water; right-click conjures via
-  a cast sequence. Updates defer in combat. Unowned or manually changed macros
-  are not overwritten; disable, rename and reset do not delete macros.
-- The druid providers maintain character macros for Rebirth in combat and Revive
-  out of combat, and for self-cast Thorns. Spell names are unranked so the client
-  uses the highest learned rank. Both Rebirth and Revive must be known.
-- The general provider maintains one account-wide general macro available to all
-  classes. Left-click eats the highest-rank conjured food in bags; right-click
-  drinks the highest-rank conjured water. `BAG_UPDATE_DELAYED` refreshes the body;
-  bank contents do not count and the last active character's bags win.
+  Use the development template in `docs/templates/MacroProvider.lua`. All
+  generated macros default off; existing enabled choices and names are preserved.
+- The mage provider maintains a character macro named **FoodWater** using
+  supported known rank tiers and localized spell names. Left-click uses
+  food/water; right-click conjures via a cast sequence. Updates defer in combat.
+  A sole same-name macro is adopted and overwritten; manual edits to an owned
+  macro are preserved. Disable, rename and reset do not delete macros.
+- The druid providers maintain character macros named **Rebirth** and **Thorns**
+  for Rebirth in combat and Revive out of combat, and for self-cast Thorns. Spell
+  names are unranked so the client uses the highest learned rank. Both Rebirth and
+  Revive must be known.
+- The general provider maintains one account-wide general macro named
+  **Food and Water**, available to all classes. Left-click eats the highest-rank
+  conjured food in bags; right-click drinks the highest-rank conjured water.
+  `BAG_UPDATE_DELAYED` refreshes the body; bank contents do not count and the
+  last active character's bags win.
 - **Macro** pairs each provider's maintenance toggle with a native Rename button on
   one page: General first, then class sections alphabetically. The EUI input
   popup edits the account name preference through shared validation, preserving

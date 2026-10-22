@@ -205,11 +205,11 @@ local function BuildPage(page, parent, y)
         Spacer()
         Section("DRUID")
         Row(Toggle("druidRebirthMacro", "enabled", "Rebirth / Revive",
-            "Maintains a character macro that casts Rebirth in combat and Revive out of combat. The highest learned rank is used automatically. Only owned macros are maintained; disabling leaves the macro intact."),
+            "Maintains a character macro that casts Rebirth in combat and Revive out of combat. The highest learned rank is used automatically. A sole same-name macro is adopted; disabling leaves the macro intact."),
             RenameButton("druidRebirthMacro", "Rename Rebirth", "Rename Rebirth",
                 "Choose the Rebirth / Revive character macro name. The name preference is account-wide."))
         Row(Toggle("druidThornsMacro", "enabled", "Self Thorns",
-            "Maintains a character macro that casts Thorns on yourself. The highest learned rank is used automatically. Only owned macros are maintained; disabling leaves the macro intact."),
+            "Maintains a character macro that casts Thorns on yourself. The highest learned rank is used automatically. A sole same-name macro is adopted; disabling leaves the macro intact."),
             RenameButton("druidThornsMacro", "Rename Thorns", "Rename Thorns",
                 "Choose the Thorns character macro name. The name preference is account-wide."))
         Text(nil, function()
@@ -221,7 +221,7 @@ local function BuildPage(page, parent, y)
         Spacer()
         Section("MAGE")
         Row(Toggle("mageMacro", "enabled", "Maintain character macro",
-            "Left-click uses food and water; right-click alternates conjure spells with a 10-second reset. Only owned macros are maintained; disabling leaves the macro intact."),
+            "Left-click uses food and water; right-click alternates conjure spells with a 10-second reset. A sole same-name macro is adopted; disabling leaves the macro intact."),
             RenameButton("mageMacro", "Rename FoodWater", "Rename Macro",
                 "Choose the character macro name. Existing macros and manual edits are preserved. The name preference is account-wide."))
         Text(nil, function()

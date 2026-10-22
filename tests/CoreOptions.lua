@@ -367,6 +367,18 @@ test("invalid persisted macro names revert to the default", function()
     end
 end)
 
+test("generated macros are opt in with short default names", function()
+    local s = core():initialize()
+    local names = {
+        mageMacro = "FoodWater", druidRebirthMacro = "Rebirth",
+        druidThornsMacro = "Thorns", generalFoodWaterMacro = "Food and Water",
+    }
+    for key, name in pairs(names) do
+        equal(s.ns.defaults[key].enabled, false)
+        equal(s.ns.defaults[key].name, name)
+    end
+end)
+
 test("every macro name preference uses the shared validator", function()
     for _, key in ipairs({ "druidRebirthMacro", "druidThornsMacro", "generalFoodWaterMacro" }) do
         local s = core({ db = { [key] = { name = "bad|name" } } }):initialize()

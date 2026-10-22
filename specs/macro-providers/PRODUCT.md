@@ -129,9 +129,9 @@ every shipped provider defaults off.
 ## Druid providers
 
 25. Druid registration is ID `druidRebirth`, key `druidRebirthMacro`, class
-    `DRUID`, label `Druid`, default name `Rebirth`, off by default. Druid Thorns
-    is ID `druidThorns`, key `druidThornsMacro`, class `DRUID`, label `Druid`,
-    default name `Thorns`, off by default. Both create character macros.
+    `DRUID`, label `Druid`, default name `Rebirth`, off by default. The Thorns
+    provider is ID `druidThorns`, key `druidThornsMacro`, class `DRUID`, label
+    `Druid`, default name `Thorns`, off by default. Both create character macros.
 26. Rebirth requires both a known Rebirth tier and a known Revive tier. Their
     strongest-first tiers are:
 

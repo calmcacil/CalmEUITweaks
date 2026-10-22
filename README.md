@@ -178,11 +178,16 @@ supported; save a fresh default for older export formats.
 ## Macros and bag upgrade arrows
 
 Open **Macro** to configure generated macros. Sections are General first, then
-Druid and Mage. Each macro pairs its maintenance toggle with a **Rename** button.
-Macro names are account-wide. Renaming does not delete earlier macros, and an
-existing unowned macro is never overwritten; choose a free name if there is a
-collision. Editing an owned macro suspends maintenance, and disabling a feature
-does not delete its macro.
+Druid and Mage. Fresh installs start with every macro off; existing enabled
+choices are preserved. Each macro pairs its
+maintenance toggle with a **Rename** button. Macro names are account-wide.
+Enabling a provider adopts the only same-name macro in its scope and updates its
+body. Duplicate names or a same-name macro in the other scope still need a free
+name. Renaming does not delete earlier macros. Editing an owned macro suspends
+maintenance, and disabling a feature does not delete its macro.
+
+The default names are **Food and Water** (general), **Rebirth**, **Thorns**, and
+**FoodWater** (mage). Existing saved names are left unchanged.
 
 **General food and water** is one account-wide macro available to every class.
 Left-click eats the highest-rank conjured food in your bags; right-click drinks
@@ -191,10 +196,10 @@ contents do not count, and the last active character's bags decide the current
 item ranks. If either food or water is missing, an existing macro is left
 unchanged.
 
-**Druid Rebirth** casts Rebirth in combat and Revive out of combat. Both spells
-must be learned. **Druid Thorns** casts Thorns on yourself. Both druid macros use
-unranked spell names, so the client casts the highest learned rank. Drag the
-character macro onto an action bar to use it.
+The druid **Rebirth** macro casts Rebirth in combat and Revive out of combat.
+Both spells must be learned. The druid **Thorns** macro casts Thorns on yourself.
+Both use unranked spell names, so the client casts the highest learned rank.
+Drag the character macro onto an action bar to use it.
 
 **FoodWater** remains conjure-based. Left-click uses food and water;
 right-click alternates the conjure spells. Both conjure spells must be learned.
