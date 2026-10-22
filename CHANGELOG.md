@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.8.0...v1.0.0) (2026-10-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* Pre-1.0 preferences reset once, and automatic anchor gap and corner features are removed. Existing macros/ownership, saved chat and spacer geometry survive. Back up account and character SavedVariables; older addon versions cannot enforce the new lineage when downgrading.
+* **whatstraining:** the "Match spellbook theme" toggle is gone; What's Training handles the training tab styling natively.
+
+### Features
+
+* finalize opt-in Calm Forever 1.0 baseline ([#37](https://github.com/calmcacil/CalmEUITweaks/issues/37)) ([3bfaf60](https://github.com/calmcacil/CalmEUITweaks/commit/3bfaf607e1f5304dde935ab15792207c85e8b353))
+* **whatstraining:** remove the spellbook theme bridge ([#35](https://github.com/calmcacil/CalmEUITweaks/issues/35)) ([107cf73](https://github.com/calmcacil/CalmEUITweaks/commit/107cf734931823e8e8d9f94227bd9fde616dfc5e))
+
 ## [0.8.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.7.0...v0.8.0) (2026-10-21)
 
 
