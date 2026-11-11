@@ -62,10 +62,14 @@ function ns.OpenOptions()
     return opened
 end
 
-local function ResetUnavailable()
+local function ResetUnavailable(recovery)
     local ready, reason = ns.SavedVariablesReady()
-    if not ready then return reason end
-    if not ns.ready then return "Wait for player login before resetting preferences." end
+    if recovery then
+        if ready or not ns.settingsError then return "Saved-data recovery is no longer required." end
+    elseif not ready then return reason end
+    if not ns.loggedIn or (not recovery and not ns.ready) then
+        return "Wait for player login before resetting preferences."
+    end
     if type(InCombatLockdown) ~= "function" or InCombatLockdown() then
         return "Cannot reset preferences during combat."
     end
@@ -102,6 +106,25 @@ ns.RequestReset = GuardReset(function()
             if not reset then ns.Print(problem); return end
             confirmed = true
             ns.Print("Preferences reset; reloading UI.")
+            ReloadUI()
+        end),
+    })
+end)
+
+ns.RequestDataRecovery = GuardReset(function()
+    local reason = ResetUnavailable(true)
+    if reason then ns.Print(reason); return end
+    local confirmed = false
+    EllesmereUI:ShowConfirmPopup({
+        title = "Discard Calm UI Tweaks Data?",
+        message = "Discard all account and current-character Calm UI Tweaks data and reload? This deletes preferences, saved chat setups, spacer geometry, macro ownership and CVar restore records. Existing macros, chat windows, EUI profiles and offline characters are unchanged. Cancel to keep the data for a future fix. Back up SavedVariables first.",
+        confirmText = "Discard and Reload", cancelText = "Cancel",
+        onConfirm = GuardReset(function()
+            if confirmed then return end
+            local reason = ResetUnavailable(true)
+            if reason then ns.Print(reason); return end
+            confirmed = true
+            CalmUITweaksDB, CalmUITweaksCharDB = nil, nil
             ReloadUI()
         end),
     })

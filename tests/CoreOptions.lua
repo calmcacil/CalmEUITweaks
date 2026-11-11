@@ -1294,13 +1294,11 @@ test("unsupported schema disables options and rejects slash reset without changi
     local s = optionsFixture({db = db}):initialize():login()
     local before = copy(db)
     for _, page in ipairs(s.pluginRegistration.modules[1].pages) do s:build(page) end
+    equal(#s.rows, 4, "Every blocked page offers only recovery")
     for _, row in ipairs(s.rows) do
-        for _, cfg in ipairs({row.left, row.right}) do
-            if cfg.type ~= "label" then
-                equal(cfg.disabled(), true)
-                contains(cfg.disabledTooltip(), "schema version")
-            end
-        end
+        equal(row.left.text, "Reset Saved Data")
+        equal(row.left.disabled(), false)
+        equal(row.right.type, "label")
     end
     s.env.SlashCmdList.CALMUITWEAKS("reset confirm")
     contains(s.messages[#s.messages], "schema version")
@@ -1308,6 +1306,47 @@ test("unsupported schema disables options and rejects slash reset without changi
     equal(s.ns.db, nil)
 end)
 
+test("broken saved data requires confirmation before discarding both stores", function()
+    local db = {calm_forever = true, schemaVersion = 1, version = 1, cvarVersion = 1, keep = true}
+    local s = optionsFixture({db = db}):initialize():login()
+    s:build("General")
+    s.rows[1].left.onClick()
+    truth(s.confirmPopup)
+    equal(s.reloads, 0)
+    equal(s.env.CalmUITweaksDB, db, "Opening or cancelling preserves broken data")
+    contains(s.confirmPopup.message, "CVar restore records")
+    s.combat = true
+    s.confirmPopup.onConfirm()
+    equal(s.reloads, 0)
+    equal(s.env.CalmUITweaksDB, db)
+    s.combat = false
+    s.env.EllesmereUI.IsUnlockModeActive = function() return true end
+    s.confirmPopup.onConfirm()
+    equal(s.reloads, 0)
+    s.env.EllesmereUI.IsUnlockModeActive = function() return false end
+    s.confirmPopup.onConfirm()
+    equal(s.env.CalmUITweaksDB, nil)
+    equal(s.env.CalmUITweaksCharDB, nil)
+    equal(s.reloads, 1)
+    s.confirmPopup.onConfirm()
+    equal(s.reloads, 1)
+end)
+
+test("saved data recovery rejects missing APIs and stale confirmation", function()
+    for _, condition in ipairs({"login", "popup", "reload", "recovered"}) do
+        local db = {calm_forever = true, schemaVersion = 1, cvarVersion = 1}
+        local s = optionsFixture({db = db}):initialize():login()
+        s.ns.RequestDataRecovery()
+        local popup = s.confirmPopup
+        if condition == "login" then s.ns.loggedIn = false
+        elseif condition == "popup" then s.env.EllesmereUI.ShowConfirmPopup = nil
+        elseif condition == "reload" then s.env.ReloadUI = nil
+        else s.ns.settingsReady = true end
+        popup.onConfirm()
+        equal(s.env.CalmUITweaksDB, db)
+        equal(s.reloads, 0)
+    end
+end)
 test("cached controls unlock after a pending schema resumes without rebuilding", function()
     local s = optionsFixture({db = {calm_forever = true, schemaVersion = 1}})
     local allow = false

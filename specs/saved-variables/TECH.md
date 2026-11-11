@@ -108,3 +108,17 @@ ownership if needed. Integrate before final combined checks. No agent pushes,
 creates PRs, tags or publishes before user testing and release approval. Avoid
 extra branches/worktrees for read-only review. Recovery state and task contracts
 live under ignored .release/1.0-preparation/SAGA.md.
+
+### Blocked saved-data recovery
+
+When invalid or unsupported saved data blocks startup, each options page shows
+the reason and a Reset Saved Data button instead of feature controls. Data stays
+unchanged unless the user accepts the EUI confirmation. Cancel allows waiting for
+a compatible build or a future fix. Back up SavedVariables before discarding.
+Confirmation discards the account and current-character addon stores and reloads
+to fresh, default-off settings. This loses preferences, saved chat defaults,
+geometry, ownership, unknown fields and CVar restoration records. It does not
+restore CVars or change actual macros, chat windows, EUI profiles or offline
+character stores. Login, combat, Unlock Mode, blocked state and popup/reload APIs
+are checked before opening and again before discarding. Pending migrations do
+not offer this recovery action. Normal preference reset keeps its existing rules.

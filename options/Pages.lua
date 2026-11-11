@@ -110,6 +110,21 @@ local function BuildPage(page, parent, y)
     end
     ns.optionsRenderError = nil
     parent._showRowDivider = true
+    if ns.settingsError then
+        local _, height = widgets:SectionHeader(parent, "SAVED DATA UNAVAILABLE", y)
+        y = Description(parent, y - height, nil, function() return ns.settingsError end)
+        y = Description(parent, y, "Your data has been preserved. You can wait for a compatible build or discard account and current-character addon data to start fresh. Back up SavedVariables before discarding.")
+        local _, rowHeight = widgets:DualRow(parent, y, {
+            type = "button", text = "Reset Saved Data", noCapture = true,
+            disabled = function()
+                return not ns.loggedIn or InCombatLockdown()
+                    or (type(eui.IsUnlockModeActive) == "function" and eui:IsUnlockModeActive())
+            end,
+            disabledTooltip = "Available after login, outside combat and outside Unlock Mode.",
+            onClick = function() ns.RequestDataRecovery() end,
+        }, eui.BlankRowCfg())
+        return math.abs(y - rowHeight) + 12
+    end
     local function Section(text)
         local _, height = widgets:SectionHeader(parent, text, y)
         y = y - height
