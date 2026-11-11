@@ -95,31 +95,22 @@ another addon; values already configured for sparkles are left as found.
 
 ## Saved-data upgrades
 
-The 1.0 candidate starts the **Calm Forever v1** saved-data lineage. First load
-converts pre-1.0 accounts once: every known preference returns to its default,
-including macro names, and every switch is off, including all three bag scopes.
-Actual macros, account/character macro ownership, saved chat default and apply
-records, spacer geometry, and unknown fields in live settings are preserved.
-Recognized retired feature roots and invalid CVar ledger entries are exceptions.
-After conversion, your new choices survive reload and character switches.
+Completed **Calm Forever schema 1** (1.0.x) is the oldest supported saved-data
+baseline. Current accounts keep enabled features, macro names, ownership,
+saved chat setups, spacer geometry and unknown fields across reloads.
+Fresh installs start with every switch off.
 
-An absent `calm_forever` marker selects historical schema 0..4/CVar 0..1 cleanup,
-not the new schema 1. Completed targeting cleanup is not replayed. Before the
-conversion commits `calm_forever = true` and `schemaVersion = 1` together, it
-restores still-owned targeting, full quest graphics and cursor CVars from valid
-records. Later external writes remain untouched. Cleanup waits for login, the
-end of combat and available APIs; unresolved records survive reloads. Later
-characters import old spacer geometry only into missing account layouts.
+Pre-beta conversion has been removed. Nonempty accounts without the
+`calm_forever = true` marker, partial conversions, conflicting metadata and
+unsupported versions remain preserved and block startup. Open settings to see
+the reason and choose whether to reset the data. No automatic reset occurs.
+`/calmtweaks status` also reports the reason.
 
-Existing nonempty accounts receive one post-login notice naming Calm Forever v1
-and explaining the preference reset. Fresh and already-current accounts stay
-silent. `/calmtweaks status` explains pending or blocked work; options remain
-visible but editing, reset and feature startup wait for completion. Malformed or
-unsupported account/character data is preserved and blocks startup before either
-store is changed. Do not edit the marker or relabel old versions to bypass cleanup.
-Back up SavedVariables before conversion or downgrading: older releases do not
-understand this marker and cannot provide downgrade safety.
-
+Historical character spacer geometry is no longer imported. Discarding old
+CVar restoration records does not restore graphics, targeting or cursor values.
+If that cleanup is needed, use a compatible older build with a backup before
+updating. Back up SavedVariables before discarding data or downgrading; never
+edit markers or schema numbers to bypass validation.
 
 ### Blocked saved-data recovery
 
@@ -194,8 +185,8 @@ supported; save a fresh default for older export formats.
 ## Macros and bag upgrade arrows
 
 Open **Macro** to configure generated macros. Sections are General first, then
-Druid and Mage. Fresh installs, lineage conversion and normal reset leave every
-macro off. Marked v1 reloads preserve enabled choices. Each macro pairs its
+Druid and Mage. Fresh installs, confirmed data recovery and normal reset leave every
+macro off. Current-schema reloads preserve enabled choices. Each macro pairs its
 maintenance toggle with a **Rename** button. Macro names are account-wide.
 Enabling a provider adopts the only same-name macro in its scope and updates its
 body. Duplicate names or a same-name macro in the other scope still need a free
@@ -203,7 +194,7 @@ name. Renaming does not delete earlier macros. Editing an owned macro suspends
 maintenance, and disabling a feature does not delete its macro.
 
 The default names are **Food and Water** (general), **Rebirth**, **Thorns**, and
-**FoodWater** (mage). Conversion/reset restores these name preferences without
+**FoodWater** (mage). Normal reset restores these name preferences without
 renaming existing macros. Rename accepts 1-16 bytes of plain text, not 16 Unicode
 characters; control characters and `|` are rejected.
 
@@ -264,9 +255,8 @@ ends.
 Preferences, general-macro ownership, the chat default and spacer geometry use
 `CalmUITweaksDB`. Character-macro ownership and chat apply records use
 `CalmUITweaksCharDB`. These are normal WoW SavedVariables, separate from EUI
-profiles. Existing character spacer geometry seeds missing account layouts on
-that character's first compatible load; established account layouts win. Retired
-character spacer roots are removed after import, not on behalf of offline characters.
+profiles. Account spacer layouts are authoritative; historical character geometry
+is no longer imported or pruned.
 
 Normal reset changes only known preference leaves, including names and all
 switches. It preserves lineage/checkpoint metadata, unknown live nested/provider

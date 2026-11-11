@@ -32,7 +32,7 @@ reports again.
 | Store | Contents |
 | --- | --- |
 | `CalmUITweaksDB` | Account preferences, general-macro ownership, saved chat default, spacer geometry (`spacerLayouts`) and sparkle/cursor console-variable restoration records. |
-| `CalmUITweaksCharDB` | Character-macro ownership and chat apply records. Initialization removes retired character roots after the legacy spacer import; other keys remain. |
+| `CalmUITweaksCharDB` | Character-macro ownership and chat apply records. Unknown and inert historical fields remain. |
 | EUI layout | Native anchor and size-match links, including offsets and growth pins. |
 
 Raw SavedVariables are validated and migrated on this addon's `ADDON_LOADED`,
@@ -50,11 +50,8 @@ feature work. Runtime, test and packaged Lua must be ASCII only.
 The source/package validator enforces ASCII and the source validator enforces
 the update-handler/ticker restriction.
 
-Legacy character spacer layouts seed missing account layouts with a deep copy
-on initialization. Existing account layouts take precedence. Retired character
-storage, including per-character spacer layouts and corner baselines, is removed
-after the import. The first loaded legacy character with geometry for a slot
-supplies that slot's account layout.
+Account spacer layouts are authoritative. Historical character spacer geometry
+is no longer imported or pruned; old character fields remain inert.
 
 The once-only `OnLogin` module callback runs after settings/readiness initialize,
 before settings application. Late initial addon loading uses the same callback.
@@ -80,46 +77,25 @@ Literal `CalmUITweaksDB.calm_forever = true` identifies the Calm Forever lineage
 preference defaults. Marked v1 reloads preserve user preferences, and later
 marked steps remain ordered and append-only.
 
-An absent marker selects legacy validation for schema 0..4/CVar 0..1. Immutable
-legacy steps run to 4 before conversion: step 1 restores retired gathering
-ownership; step 2 adopts the account schema and migrates shared anchor gaps;
-step 3 adds the default-off cursor preference without native writes; step 4 removes
-recognized retired account roots (`gatheringSparkles`, `whatsTraining`, `anchorGap`,
-`spacerCorners`) and legacy markers. Completed CVar cleanup is not replayed.
-
-The bridge then restores full historical quest graphics and `HardwareCursor`
-ledgers before staging a known preference-leaf reset, including macro names.
-Every boolean is false: all macro providers, bag arrows and inventory/reagent/bank
-scopes, quest sparkles, cursor fix, LFG labels, chat automation and four spacers.
-Valid live tables retain unknown nested/provider keys. Account/character macro
-ownership, real macros, chat default/receipts, geometry and unknown root keys
-survive; explicitly retired roots and invalid ledger entries are exceptions.
-Retired character `spacers`/`spacerCorners` are removed only after lazy geometry
-import on that character's compatible load. Offline characters are not certified.
+Completed Calm Forever schema 1 is the oldest supported baseline. Missing or
+empty account data initializes directly with all preferences off and default
+macro names, without native reads or an upgrade notice. Nonempty unmarked data,
+including old schema 0..4 and partial conversions, is preserved and blocks startup
+instead of running historical migration or CVar restoration. Current marked data
+retains preferences, content, geometry, ownership and unknown fields.
 
 Preflight validates both raw stores before mutation or native reads. Non-table
-roots, present nontrue markers, marked missing/0/future/malformed checkpoints,
-conflicting legacy metadata and unsupported character metadata fail closed.
-Marked data cannot contain legacy account version/CVar metadata. Character
-`version` remains absent/1, with no character schema counter. Invalid stores are
-preserved rather than normalized or reinterpreted as legacy schema 1.
+roots, nontrue markers, missing/0/future/malformed checkpoints, conflicting
+account version/CVar metadata and unsupported character metadata block startup.
+Character `version` remains absent/1 with no character schema counter.
 
-Legacy steps checkpoint only after success. The final baseline preference reset,
-marker and v1 checkpoint commit atomically; failed data conversion discards
-staged preferences. Partial native restoration is durable and retries after
-login, combat or API readiness, including reload/character switches. Pending or
-blocked work disables feature initialization, setters and reset; options remain
-discoverable with native disabled-state feedback and status reasons. Once ready,
-startup resumes once and releases migration subscriptions, without polling.
-
-Existing nonempty accounts get one post-login completion notice naming Calm
-Forever v1 and explaining that preferences reset, not an ordinary numeric 4->1
-upgrade. Fresh/current accounts stay silent; later same-lineage upgrades use
-schema-version notices. Pending/failed work never announces success. Reload and
-reset do not repeat notices. Back up SavedVariables before conversion/downgrade:
-older binaries ignore the marker; never manually relabel versions or remove it.
-The [CVar cleanup guide](specs/cvar-migrations/TECH.md) uses this same runner.
-
+Future same-lineage steps start at schema 2, remain ordered and checkpoint only
+successful work. Staged data failures cannot commit preferences; partial native
+restoration is durable across readiness events and reload. Pending work blocks
+feature initialization and setters; completion resumes startup once and releases
+subscriptions. Only completed upgrades of existing supported data announce their
+schema versions. Fresh/current accounts remain silent. The
+[CVar cleanup guide](specs/cvar-migrations/TECH.md) uses this runner.
 
 ### Blocked saved-data recovery
 
@@ -138,20 +114,9 @@ not offer this recovery action. Normal preference reset keeps its existing rules
 ### Retired targeting settings
 
 Ore/herb sparkles have no module, toggle, animations or target/nameplate event
-subscriptions. For accounts pending legacy migration 1, the runner validates
-`gatheringSparkles.restore` against the eight former targeting CVars, retaining
-only recognized applied values and string baselines. Preparation removes the
-old enabled preference immediately
-and deletes the saved ledger after restoring still-owned values or observing
-later external writes. It never sets targeting defaults or touches quest graphics.
-
-Native cleanup starts after login and defers through combat or unavailable console
-APIs. Failed restores survive reload and character changes; reset is rejected
-while the schema is pending, preserving the unfinished ledger. Only
-pending cleanup subscribes to world/variable readiness and relevant CVar changes;
-combat-end is subscribed only while waiting. Own writes schedule no work. Fresh
-installs and completed cleanup have no cleanup frame subscriptions or polling.
-The existing module status/error boundary reports pending work and failures.
+subscriptions. Historical gathering cleanup and pre-beta CVar conversion are
+removed. Unsupported saves remain preserved for confirmed recovery or use with
+a compatible older build and backup; this addon does not guess native defaults.
 
 ## Feature contracts
 
@@ -380,21 +345,21 @@ native rendering, CVar restoration or macro execution.
   conversion notice and every switch off: four macro providers, bag arrows and
   inventory/reagent/bank scopes, quest sparkles, cursor, LFG, chat auto-apply and
   four spacers. No macro, chat or native CVar changes occur on an empty baseline.
-- [ ] Convert unmarked legacy schema 0..4/CVar 0..1 fixtures, including enabled
-  features and renamed macros. Verify old cleanup precedes the v1 commit, every
-  switch becomes off and names reset once. One post-login notice names the new
-  lineage and reset. Real macros/bodies, both ownership scopes, chat default and
-  receipts, geometry, unknown root/live nested/provider keys survive; only retired
-  roots/invalid ledger entries are discarded. No gathering toggle/search/effect
-  remains. Later characters import only missing geometry before retired roots go.
-- [ ] With recorded ownership, verify all eight targeting, five quest graphics and
-  cursor CVars restore from valid baselines; later external values survive.
-  Exercise pending combat/API cleanup, partial restore, reload and another
-  character. Marker/v1 must not commit early; options/setters/reset/features wait,
-  then startup resumes once. On disposable malformed/future stores, confirm both
-  stores remain untouched, editing is blocked and no success notice appears.
+- [ ] Load unmarked pre-beta schema 0..4/CVar 0..1, partial conversions and
+  malformed/future stores. Both raw stores remain untouched; no feature starts,
+  no native CVar changes occur and no success notice appears. All four pages
+  show the reason and Reset Saved Data. Search and cached navigation remain usable.
+- [ ] Cancel recovery and reload: original data stays blocked and preserved.
+  Confirm Discard and Reload: account/current-character stores initialize fresh,
+  all features stay off, settings can be enabled and choices survive reload.
+  Combat or Unlock Mode before/during confirmation blocks data loss. Actual
+  macros, chat windows, EUI profiles and offline character stores stay unchanged.
+- [ ] Switch to a character with old spacer layouts: geometry is not imported or
+  pruned, and current account geometry is unchanged. Fresh account data cannot
+  recover discarded geometry from an old character store. Current macro ownership
+  and chat receipts remain usable.
 - [ ] On marked v1, opt in and rename, reload and switch characters: choices
-  survive without another conversion notice. Run normal reset: known leaves and
+  survive without an upgrade notice. Run normal reset: known leaves and
   names return to defaults, but metadata, nested/provider keys, ownership, real
   macros, chat/history/receipts and geometry remain; owned CVars restore. Run
   `/calmtweaks reset`: Cancel must do nothing; Reset and Reload must reset then

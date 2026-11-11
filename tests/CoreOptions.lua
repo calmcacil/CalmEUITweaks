@@ -326,8 +326,8 @@ test("own ADDON_LOADED creates independent saved settings and ownership storage"
     s:storageUnchanged()
 end)
 
-test("default filling preserves false and unknown values while removing retired roots", function()
-    local db = { version = 1, mageMacro = { enabled = false, name = 42, extra = "keep" },
+test("default filling preserves current choices and unknown fields", function()
+    local db = { calm_forever = true, schemaVersion = 1, mageMacro = { enabled = false, name = 42, extra = "keep" },
         simpleItemLevel = { enabled = false, inventory = false, reagent = false, bank = "bad" },
         unrelated = { keep = 17 }, whatsTraining = { enabled = true }, anchorGap = { enabled = true } }
     local ownership = { name = "Owned", body = "/use water", marker = true }
@@ -346,12 +346,12 @@ test("default filling preserves false and unknown values while removing retired 
     equal(db.simpleItemLevel.reagent, false)
     equal(db.simpleItemLevel.bank, false)
     equal(db.unrelated.keep, 17, "unrecognized account keys are preserved")
-    equal(db.whatsTraining, nil, "retired account roots are removed")
-    equal(db.anchorGap, nil, "retired anchor settings are removed")
+    truth(db.whatsTraining.enabled, "Unknown account roots are preserved")
+    truth(db.anchorGap.enabled, "Old fields remain inert")
     equal(charDB.version, 1)
     same(charDB.mageMacro, ownership)
     equal(charDB.another, false, "unrecognized character keys are preserved")
-    equal(charDB.spacerCorners, nil, "retired character roots are removed")
+    truth(charDB.spacerCorners.player, "Old character fields remain inert")
     s:storageUnchanged()
 end)
 
@@ -363,7 +363,7 @@ test("malformed roots are preserved while recognized nested settings are repaire
         equal(s.env.CalmUITweaksCharDB, value)
         truth(s.ns.settingsError, "Malformed roots require an explicit recovery decision")
     end
-    local s = core({ db = { mageMacro = false, simpleItemLevel = "bad" },
+    local s = core({ db = { calm_forever = true, schemaVersion = 1, mageMacro = false, simpleItemLevel = "bad" },
         charDB = { mageMacro = "bad" } }):initialize()
     same(s.ns.db, initializedDefaults(s))
     same(s.ns.charDB.mageMacro, {})
@@ -371,7 +371,7 @@ end)
 
 test("invalid persisted macro names revert to the default", function()
     for _, name in ipairs({ "", "   ", string.rep("x", 17), "bad|name", "bad\nname", false, {} }) do
-        local s = core({ db = { mageMacro = { name = name } } }):initialize()
+        local s = core({ db = { calm_forever = true, schemaVersion = 1, mageMacro = { name = name } } }):initialize()
         equal(s.ns.db.mageMacro.name, "FoodWater")
     end
 end)
@@ -417,7 +417,7 @@ end)
 
 test("every macro name preference uses the shared validator", function()
     for _, key in ipairs({ "druidRebirthMacro", "druidThornsMacro", "generalFoodWaterMacro" }) do
-        local s = core({ db = { [key] = { name = "bad|name" } } }):initialize()
+        local s = core({ db = { calm_forever = true, schemaVersion = 1, [key] = { name = "bad|name" } } }):initialize()
         equal(s.ns.db[key].name, s.ns.defaults[key].name)
         equal(s.ns.SetSetting(key, "name", "  New Name  "), true)
         equal(s.ns.db[key].name, "New Name")
@@ -664,7 +664,7 @@ end)
 
 test("reset preserves account-scope macro ownership", function()
     local records = { ["Food and Water"] = { lastGeneratedBody = "/use item:5349" } }
-    local s = core({ db = { generalFoodWaterMacro = {
+    local s = core({ db = { calm_forever = true, schemaVersion = 1, generalFoodWaterMacro = {
         enabled = false, name = "Custom", ownedMacros = records,
     } } }):initialize()
     s.ns.ResetSettings()
@@ -676,10 +676,10 @@ end)
 test("reset disables chat automation while preserving the default and character receipt", function()
     local preset = { export = "stored chat setup", savedAt = 123 }
     local receipt = { appliedExport = preset.export, appliedSavedAt = 123, appliedAt = 124 }
-    local s = core({ db = { chat = { autoApply = true, default = preset } },
+    local s = core({ db = { calm_forever = true, schemaVersion = 1, chat = { autoApply = true, default = preset } },
         charDB = { chat = receipt } }):initialize():login()
     local before = copy(receipt)
-    same(s.ns.db.chat.default, preset, "Migration preserves the saved chat content")
+    same(s.ns.db.chat.default, preset, "Startup preserves the saved chat content")
     local savedDefault = s.ns.db.chat.default
     s.ns.ResetSettings()
     equal(s.ns.db.chat.autoApply, false)
@@ -698,33 +698,18 @@ test("reset before PLAYER_LOGIN does not activate modules", function()
     equal(s.ns.ready, nil)
 end)
 
-test("spacer layouts migrate to account storage without replacing shared layouts", function()
-    local legacy = { [1] = { width = 63, height = 18,
-        position = { point = "CENTER", relPoint = "CENTER", x = 44, y = -90 } } }
-    local receipt = { appliedSavedAt = 123, appliedAt = 125 }
-    local baseline = { player = { base = -10, side = "LEFT" } }
-    local first = core({ db = { spacers = { spacer1 = true }, spacerCorners = { player = "TOPRIGHT" } },
-        charDB = { spacers = legacy, chat = receipt, spacerCorners = baseline } }):initialize()
-    same(first.ns.db.spacerLayouts, legacy)
-    truth(first.ns.db.spacerLayouts[1] ~= legacy[1], "migration must copy the layout")
-    truth(first.ns.db.spacerLayouts[1].position ~= legacy[1].position, "migration must copy nested position")
-    equal(first.ns.charDB.spacers, nil)
-    equal(first.ns.charDB.spacerCorners, nil, "retired character baselines are pruned")
-    equal(first.ns.db.spacerCorners, nil, "retired account alignment is pruned")
-    same(first.ns.charDB.chat, receipt)
-    equal(first.ns.db.spacers.spacer1, false, "baseline conversion is opt in")
-    truth(first.ns.SetSetting("spacers", "spacer1", true))
-    local second = core({ db = copy(first.ns.db),
-        charDB = { spacers = { [1] = { width = 99, height = 99 } } } }):initialize()
-    equal(second.ns.db.spacerLayouts[1].width, 63, "later characters must not overwrite account geometry")
-    equal(second.ns.db.spacerLayouts[1].position.x, 44)
-    equal(second.ns.db.spacers.spacer1, true)
-    same(second.ns.charDB.chat, {})
-    equal(second.ns.charDB.spacerCorners, nil)
-    local layouts = second.ns.db.spacerLayouts
-    second.ns.ResetSettings()
-    equal(second.ns.db.spacerLayouts, layouts, "preference reset preserves shared geometry")
-    equal(second.ns.db.spacers.spacer1, false)
+test("old character geometry is inert and account geometry survives reset", function()
+    local layouts = {[1] = {width = 63, height = 18}}
+    local legacy = {[1] = {width = 99}, [2] = {width = 25}}
+    local s = core({db = {calm_forever = true, schemaVersion = 1, spacerLayouts = layouts,
+        spacers = {spacer1 = true}}, charDB = {spacers = legacy}}):initialize()
+    equal(s.ns.db.spacerLayouts, layouts)
+    equal(s.ns.db.spacerLayouts[2], nil)
+    equal(s.ns.charDB.spacers, legacy)
+    truth(s.ns.db.spacers.spacer1)
+    truth(s.ns.ResetSettings())
+    equal(s.ns.db.spacerLayouts, layouts)
+    equal(s.ns.db.spacers.spacer1, false)
 end)
 
 test("session login hook runs once after readiness and before settings apply", function()
@@ -1290,7 +1275,7 @@ test("missing or failing active-module APIs never refresh unrelated pages", func
 end)
 
 test("unsupported schema disables options and rejects slash reset without changing data", function()
-    local db = {schemaVersion = 99, mageMacro = {enabled = false}, keep = "future"}
+    local db = {calm_forever = true, schemaVersion = 99, mageMacro = {enabled = false}, keep = "future"}
     local s = optionsFixture({db = db}):initialize():login()
     local before = copy(db)
     for _, page in ipairs(s.pluginRegistration.modules[1].pages) do s:build(page) end
@@ -1308,7 +1293,7 @@ end)
 
 test("broken saved data requires confirmation before discarding both stores", function()
     local db = {calm_forever = true, schemaVersion = 1, version = 1, cvarVersion = 1, keep = true}
-    local s = optionsFixture({db = db}):initialize():login()
+    local s = optionsFixture({db = db, charDB = {version = 1, keep = true}}):initialize():login()
     s:build("General")
     s.rows[1].left.onClick()
     truth(s.confirmPopup)
@@ -1330,6 +1315,11 @@ test("broken saved data requires confirmation before discarding both stores", fu
     equal(s.reloads, 1)
     s.confirmPopup.onConfirm()
     equal(s.reloads, 1)
+    local recovered = optionsFixture({db = s.env.CalmUITweaksDB, charDB = s.env.CalmUITweaksCharDB}):initialize():login()
+    truth(recovered.ns.SavedVariablesReady())
+    truth(recovered.ns.SetSetting("lfgLeaderLocation", "enabled", true))
+    local reload = optionsFixture({db = recovered.ns.db, charDB = recovered.ns.charDB}):initialize():login()
+    truth(reload.ns.db.lfgLeaderLocation.enabled, "Confirmed recovery leaves usable persistent settings")
 end)
 
 test("saved data recovery rejects missing APIs and stale confirmation", function()
@@ -1620,7 +1610,7 @@ end)
 
 test("late bag addon loads refresh cached controls even when the patch is off", function()
     local s = optionsFixture({ loadedAddons = {}, db = {
-        simpleItemLevel = { enabled = false },
+        calm_forever = true, schemaVersion = 1, simpleItemLevel = { enabled = false },
     } }):initialize():login()
     s:build("General")
     local eui, states, calls = s.env.EllesmereUI, {}, 0

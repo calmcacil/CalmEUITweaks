@@ -1,124 +1,62 @@
-# SavedVariables schema implementation
+# Supported SavedVariables Implementation
 
 ## Context
 
-[PRODUCT.md](PRODUCT.md) defines the approved preference-preserving reset choice.
-At baseline c7be7b8, [Migrations](../../core/Migrations.lua) runs legacy steps
-1..4; [Settings](../../core/Settings.lua) fills defaults afterward and normal
-reset replaces known subtrees. [Lifecycle](../../core/Lifecycle.lua) already
-blocks features until settings are ready. Reuse that runner, event driver and
-barrier rather than adding another lifecycle.
+The approved boundary in [PRODUCT.md](PRODUCT.md) retires unmarked pre-beta data.
+Baseline: commit 9e43f29. `core/Migrations.lua` has legacy steps 1..4, a schema-1
+bridge, raw-store preflight, native cleanup descriptors, atomic data-step commits
+and event-driven retries. `core/Settings.lua` still imports character spacers.
+The 1.0.1 options adapter already supports confirmed discard and reload while
+settings are blocked. Reuse it; do not add another recovery mechanism.
 
-## Proposed changes
+## Changes
 
-### Explicit lineages and bridge
+- Remove `LEGACY_SCHEMA_VERSION`, `legacySchemaMigrations` and the schema-1
+  bridge, including retired targeting definitions, gap conversion, retired-root
+  pruning, bridge-only preference reset and its completion notice.
+- Keep `SCHEMA_VERSION = 1` and an empty `schemaMigrations` table for future
+  steps beginning at 2. A missing/empty account starts at baseline 1. Normalize
+  fresh account/character candidates before publishing marker and checkpoint;
+  no native reads, restoration or migration subscriptions are needed.
+- Preflight both roots before mutation. Nil roots are allowed; non-table roots
+  block. Nonempty accounts require the marker, bounded integer checkpoint and
+  absence of account version/CVar counters. Character metadata remains absent/1
+  version and no schema counter. Rejected data sets settingsError and is not
+  exposed through ns.db/ns.charDB. Existing options recovery handles it.
+- Remove legacy-versus-marked branches from the runner. Retain ordered future
+  steps, staged data callbacks, cleanup descriptors, durable partial native
+  restoration, status/errors, coalesced readiness retries and numeric notices.
+  Do not add hypothetical upgrade entries or another scheduling abstraction.
+- Remove character spacer import and retired-character-root deletion from
+  NormalizeSettings. Continue filling known defaults, validating macro names
+  and preserving live unknown/provider fields. Old character geometry stays
+  inert and cannot refill missing account layouts after a confirmed discard.
+- Keep core/CVars.lua and quest/cursor feature ownership logic unchanged.
+  Historical conversion cleanup is removed; active ownership is still needed.
+- Align SPEC.md, README.md, AGENTS.md and specs/cvar-migrations/TECH.md. Replace
+  stale instructions requiring immutable pre-beta migrations with this supported
+  baseline. Propose release 1.1.0 with a Release-As commit/PR trailer; Release
+  Please owns version files. Publication is a separate action.
 
-Keep the shipped legacy entries unchanged in `ns.legacySchemaMigrations`, with
-fixed `ns.LEGACY_SCHEMA_VERSION = 4`. Declare `ns.SCHEMA_VERSION = 1` for the new
-lineage and a separate `ns.schemaMigrations` table in the same module. The new
-lineage is identified by literal `calm_forever = true`, not by a release number.
+## Validation
 
-Preflight both raw globals before mutating or reading native state. Accept nil
-roots, reject other non-table roots. Missing marker uses the existing legacy
-validator (schema0..4, CVar0/1, account version absent/1 and conflict checks).
-Present nontrue markers block. Marked stores require integer schemaVersion1..target
-and no legacy account version/CVar metadata; true+missing/0/future/malformed
-checkpoint blocks. Character metadata remains absent/1 version and no schemaVersion.
-Keep marker and checkpoint outside preference defaults.
-
-For unmarked data, run outstanding legacy entries to4, checkpointing each as
-before. Then run the baseline step. It restores full historical quest graphics
-and HardwareCursor definitions in disabled mode through the existing persistent
-ledger helper, before staging the preference reset. No native read is needed
-for empty ledgers. Register readiness/world/CVar/combat events only while work
-is pending; own writes do not queue recursion. Failure leaves marker absent and
-legacy checkpoint durable, so reload resumes without guessing prior values.
-
-The baseline entry supports cleanup descriptors followed by a pure-data
-callback. Current descriptors are immutable historical snapshots, not aliases to
-future feature policies. Reuse existing CVar-step execution and atomic copy/commit
-for data steps. A failure or exception does not stamp completion. The final
-account commit includes reset preferences, marker and schema1 together. Future
-marked steps remain ordered and append-only, with no ordinary bridge replay.
-
-### Preference reset and normalization
-
-Add one `ns.ResetPreferences(db)` helper that recursively assigns only known
-scalar defaults, repairing malformed known tables without replacing valid ones.
-Empty defaults such as spacerLayouts do not erase user contents. This preserves
-nested unknown/provider fields, ownership, chat.default, geometry and restoration
-ledgers. Reuse it for baseline conversion and normal ResetSettings; remove the
-old save-and-reinsert whitelist once redundant. This helper has no lifecycle,
-frames or native writes. Every boolean default, including bag scopes, is false.
-
-Stage the baseline account copy before commit; do not invoke public ResetSettings
-from a migration. Normal settings initialization retains lazy character spacer
-import and retired character cleanup. Character data is not reset or certified
-by the account marker. Account/root identity and existing shared stores remain.
-
-### Notifications and downgrade safety
-
-Capture starting lineage/version and whether raw account data was nonempty.
-Converted existing accounts get one post-login notice naming calm_forever v1 and
-that preferences reset. Fresh and marked-current stores are silent; future marked
-upgrades retain numeric version notices. Do not describe old4->new1 as an ordinary
-numeric upgrade. The in-memory notice cannot guarantee delivery across a crash.
-Older binaries ignore the marker; document backup/restore rather than claiming
-retroactive downgrade protection. External deletion of the marker can replay
-conversion and is not a supported normal operation.
-
-## Testing and validation
-
-- Product1..3,7: fresh/empty, legacy CVar0/1/schema0..4 versus marked1; all boolean
-  defaults and reset leaves false; preserved choices after marked reload; marker
-  and checkpoint are atomic and excluded from reset/defaults.
-- Product4,9,11: unknown root/live nested fields, account/character/provider macro
-  ownership, actual macro bodies, chat default/receipts, account geometry and lazy
-  character imports; original root identity. Explicitly retired roots remain the
-  preservation exception. Native macro/chat writes never occur on conversion.
-- Product5..8: gathering plus five quest CVars and cursor restore; login, combat,
-  missing APIs/values, setter rejection/throw/readback failure, external values,
-  partial progress/reload/alternate-character, injected data-step failures.
-- Product8: false/string/table marker, marked nil/0/future/malformed checkpoints,
-  legacy metadata conflicts and unsupported opposite root; no mutations/reads or
-  feature callbacks, options editing or successful reset while blocked.
-- Product6,10,12: integration through real Lifecycle/Settings, one startup, pending
-  options disabled then cached recovery, notice timing/silence, released events.
-- Preserve tests that exercise historical entries instead of blindly renumbering
-  old4 assertions to1. Mark current-behavior fixtures explicitly as calm_forever1.
-- Slash reset uses the native EUI popup via the options adapter. CoreOptions
-  tests cancellation/no early mutation, single confirmed reset-before-reload,
-  callback readiness/combat/Unlock Mode rechecks and unavailable APIs or failures.
-  Direct `ResetSettings` stays a non-reloading preference operation for callers.
-- Run focused Lua regressions, full `mise run check`, `git diff --check`, independent
-  read-only safety review and local archive validation using check-package.sh.
-  Prove high-value tests fail when baseline reset/checkpoint or opt-in defaults
-  are temporarily broken, then restore and rerun.
-- Product14: user backs up real SavedVariables and tests fresh install, legacy
-  conversion, pending combat/API cleanup, reload/alt and each opt-in feature.
-  Include cursor response/restore, native bag overlay layering, dividers/search,
-  all macro providers and spacer Save/Discard. Mocks cannot prove native UI/CVars.
-
-## Parallelization
-
-The orchestrator owns coupled settings, migrations and fixture adaptation in the
-main checkout; read-only reviewers independently inspect the same files without
-edits. Independent implementation workers use isolated worktrees and bounded file
-ownership if needed. Integrate before final combined checks. No agent pushes,
-creates PRs, tags or publishes before user testing and release approval. Avoid
-extra branches/worktrees for read-only review. Recovery state and task contracts
-live under ignored .release/1.0-preparation/SAGA.md.
-
-### Blocked saved-data recovery
-
-When invalid or unsupported saved data blocks startup, each options page shows
-the reason and a Reset Saved Data button instead of feature controls. Data stays
-unchanged unless the user accepts the EUI confirmation. Cancel allows waiting for
-a compatible build or a future fix. Back up SavedVariables before discarding.
-Confirmation discards the account and current-character addon stores and reloads
-to fresh, default-off settings. This loses preferences, saved chat defaults,
-geometry, ownership, unknown fields and CVar restoration records. It does not
-restore CVars or change actual macros, chat windows, EUI profiles or offline
-character stores. Login, combat, Unlock Mode, blocked state and popup/reload APIs
-are checked before opening and again before discarding. Pending migrations do
-not offer this recovery action. Normal preference reset keeps its existing rules.
+1. Replace conversion fixtures with unsupported-save cases: unmarked schema0..4,
+   version1/CVar0..1 combinations, enabled preferences and full old ledgers,
+   partially converted/conflicting markers, malformed roots/checkpoints and
+   future schemas. Assert both raw stores stay unchanged, no native reads/writes,
+   no feature callbacks/notices, no retry subscriptions and rejected setters/reset.
+2. Exercise fresh nil/empty roots, invalid opposite root, failed fresh
+   normalization, current enabled choices, ownership/chat/unknown fields and
+   inert character layouts. Verify reload, late addon load, one-time startup,
+   default-off reset and current quest/cursor restoration.
+3. Retain meaningful future-schema coverage: copy/commit failure, missing step,
+   ordered checkpoints across reload, data rename before defaults, combat/API
+   readiness, partial CVar cleanup, external writes and recovery callbacks.
+4. Update CoreOptions and TOC smoke fixtures to explicitly identify current
+   data. Keep dedicated raw legacy fixtures unmarked. Test blocked recovery
+   Cancel/confirm and reloading fresh with settings usable and persistent.
+5. Run mise trust, mise install, mise run check and git diff --check. Review the
+   diff for unintended deletion of active ownership helpers or current data.
+   Native verification remains: back up saves, load old/current/fresh data,
+   switch pages/search, cancel and confirm recovery, reload, use an alternate
+   character, and check current quest/cursor enable-disable/combat restoration.

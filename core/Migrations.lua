@@ -2,80 +2,10 @@ local _, ns = ...
 local module = { asyncErrors = true }
 ns.RegisterModule("migrations", module)
 
-ns.LEGACY_SCHEMA_VERSION = 4
--- Historical entries remain immutable for direct upgrades from pre-1.0 data.
-ns.legacySchemaMigrations = {
-    [1] = {
-        settingsKey = "gatheringSparkles", retired = true,
-        values = {
-            { "SoftTargetInteract", "3" },
-            { "SoftTargetInteractRange", "15" },
-            { "SoftTargetInteractArc", "2" },
-            { "SoftTargetInteractOnlyInRange", "0" },
-            { "SoftTargetIconInteract", "1" },
-            { "SoftTargetIconGameObject", "1" },
-            { "SoftTargetLowPriorityIcons", "1" },
-            { "SoftTargetNameplateInteract", "0", "1" },
-        },
-    },
-    [2] = {
-        migrate = function(db)
-            local gaps = db.anchorGap
-            if type(gaps) == "table" then
-                local value = gaps.pixels
-                if type(value) == "number" and value == value and value >= 0 and value <= 10
-                    and value == math.floor(value) then
-                    for _, side in ipairs({ "top", "bottom", "left", "right" }) do
-                        if gaps[side] == nil then gaps[side] = value end
-                    end
-                end
-                gaps.pixels = nil
-            end
-            db.version, db.cvarVersion = nil, nil
-            return true
-        end,
-    },
-    [3] = {
-        migrate = function(db)
-            if db.cursorWashedOut == nil then db.cursorWashedOut = { enabled = false } end
-            return true
-        end,
-    },
-    -- Legacy checkpoint 4 retires these roots; the new lineage starts below.
-    -- Unrecognized roots may belong to macro providers or user data.
-    [4] = {
-        migrate = function(db)
-            for _, key in ipairs({ "gatheringSparkles", "whatsTraining", "anchorGap",
-                "spacerCorners", "version", "cvarVersion" }) do
-                db[key] = nil
-            end
-            return true
-        end,
-    },
-}
 ns.SCHEMA_VERSION = 1
-ns.schemaMigrations = {
-    [1] = {
-        cleanup = {
-            { settingsKey = "questLootSparkles", values = {
-                { "outlineModeShowLootEffectWhenDisabled", "1" },
-                { "graphicsOutlineMode", "0" },
-                { "OutlineEngineMode", "0" },
-                { "raidGraphicsOutlineMode", "0" },
-                { "RAIDOutlineEngineMode", "0" },
-            } },
-            { settingsKey = "cursorWashedOut", values = { { "HardwareCursor", "0" } } },
-        },
-        migrate = function(db)
-            -- Legacy checkpoint 4 can still carry recognized stale metadata.
-            db.version, db.cvarVersion = nil, nil
-            return ns.ResetPreferences(db)
-        end,
-        normalize = true,
-    },
-}
+ns.schemaMigrations = {}
 local events, watched = nil, {}
-local origin, existing, startedMarked, notice
+local origin, existing, notice
 
 local function Integer(value, maximum)
     return type(value) == "number" and value == value and value >= 0
@@ -89,25 +19,18 @@ local function Version(account, character)
     if character.schemaVersion ~= nil or (character.version ~= nil and character.version ~= 1) then
         return nil, "Unsupported character saved-data version; data preserved."
     end
-    local marker, legacy, schema = account.calm_forever, account.cvarVersion, account.schemaVersion
-    if marker ~= nil then
-        if marker ~= true then return nil, "Unsupported saved-data lineage; data preserved." end
-        if not Integer(schema, ns.SCHEMA_VERSION) or schema < 1 then
-            return nil, "Unsupported Calm Forever schema version; update the addon or restore a compatible backup."
-        end
-        if account.version ~= nil or legacy ~= nil then
-            return nil, "Conflicting saved-data lineage metadata; data preserved."
-        end
-        return schema, nil, true
+    if next(account) == nil then return 1 end
+    if account.calm_forever ~= true then
+        return nil, "Unsupported pre-beta or invalid saved data; data preserved. Use Reset Saved Data to start fresh."
     end
-    if account.version ~= nil and account.version ~= 1 then return nil, "Unsupported legacy account version; data preserved." end
-    if legacy ~= nil and not Integer(legacy, 1) then return nil, "Unsupported legacy CVar version; data preserved." end
-    if schema ~= nil then
-        if not Integer(schema, ns.LEGACY_SCHEMA_VERSION) then return nil, "Unsupported legacy saved-data schema version; update the addon or restore a compatible backup." end
-        if legacy and legacy > schema then return nil, "Conflicting saved-data versions; data preserved." end
-        return schema
+    local schema = account.schemaVersion
+    if not Integer(schema, ns.SCHEMA_VERSION) or schema < 1 then
+        return nil, "Unsupported Calm Forever schema version; update the addon or restore a compatible backup."
     end
-    return legacy or 0
+    if account.version ~= nil or account.cvarVersion ~= nil then
+        return nil, "Conflicting saved-data lineage metadata; data preserved."
+    end
+    return schema
 end
 
 local function StopEvents()
@@ -141,7 +64,7 @@ local function Commit(target, candidate)
     for key, value in pairs(candidate) do target[key] = value end
 end
 
-local function RunStep(step, account, version, marked)
+local function RunStep(step, account, version)
     if step.cleanup then
         for _, cleanup in ipairs(step.cleanup) do
             local done, reason = RunStep(cleanup, account)
@@ -158,7 +81,7 @@ local function RunStep(step, account, version, marked)
             ns.NormalizeSettings(candidate, character)
         end
         candidate.schemaVersion = version
-        if marked then candidate.calm_forever = true end
+        candidate.calm_forever = true
         -- Publish normalized preferences and lineage together, without callbacks.
         Commit(account, candidate)
         if character then Commit(CalmUITweaksCharDB, character) end
@@ -189,15 +112,15 @@ local function RunStep(step, account, version, marked)
     return true
 end
 
-local function Advance(account, version, target, steps, marked)
-    while version < target do
-        local step = steps[version + 1]
+local function Advance(account, version)
+    while version < ns.SCHEMA_VERSION do
+        local step = ns.schemaMigrations[version + 1]
         if type(step) ~= "table" then
             ns.settingsPending, ns.settingsError = false, "Missing saved-data migration " .. (version + 1) .. "."
             ns.SetStatus("migrations", ns.settingsError)
             return false, ns.settingsError
         end
-        local ok, done, problem = pcall(RunStep, step, account, version + 1, marked)
+        local ok, done, problem = pcall(RunStep, step, account, version + 1)
         if not ok then
             Subscribe(step.cleanup or not step.migrate)
             Pending("Saved-data migration " .. (version + 1) .. " failed; waiting to retry.")
@@ -211,7 +134,7 @@ local function Advance(account, version, target, steps, marked)
         StopEvents()
         version = version + 1
         account.schemaVersion = version
-        if marked then account.calm_forever = true end
+        account.calm_forever = true
         ns.ClearError("migrations")
     end
     return true
@@ -220,32 +143,30 @@ end
 function ns.RunSchemaMigrations()
     StopEvents()
     local account, character = CalmUITweaksDB, CalmUITweaksCharDB
-    local version, reason, marked = Version(account, character)
+    local version, reason = Version(account, character)
     if version == nil then
         ns.settingsPending, ns.settingsError = false, reason
         ns.SetStatus("migrations", reason)
         return false, reason
     end
     if origin == nil then
-        origin, startedMarked = version, marked
+        origin = version
         existing = type(account) == "table" and next(account) ~= nil
     end
     account, character = account or {}, character or {}
-    CalmUITweaksDB, CalmUITweaksCharDB = account, character
-    if not marked then
-        local ok, problem = Advance(account, version, ns.LEGACY_SCHEMA_VERSION, ns.legacySchemaMigrations)
-        if not ok then return false, problem end
-        version = 0
+    if next(account) == nil then
+        local candidate, characterCandidate = {}, ns.Copy(character)
+        ns.NormalizeSettings(candidate, characterCandidate)
+        candidate.calm_forever, candidate.schemaVersion = true, 1
+        Commit(account, candidate)
+        Commit(character, characterCandidate)
     end
-    local ok, problem = Advance(account, version, ns.SCHEMA_VERSION, ns.schemaMigrations, true)
+    CalmUITweaksDB, CalmUITweaksCharDB = account, character
+    local ok, problem = Advance(account, version)
     if not ok then return false, problem end
     ns.settingsPending, ns.settingsError = false, nil
-    if existing then
-        if not startedMarked then
-            notice = 'savedvarsdb initialized for "calm_forever" schema "1"; preferences reset, all features disabled.'
-        elseif ns.SCHEMA_VERSION > origin then
-            notice = string.format('savedvarsdb updated from "%d" to "%d"', origin, ns.SCHEMA_VERSION)
-        end
+    if existing and ns.SCHEMA_VERSION > origin then
+        notice = string.format('savedvarsdb updated from "%d" to "%d"', origin, ns.SCHEMA_VERSION)
     end
     ns.ClearError("migrations")
     ns.SetStatus("migrations", "SavedVariables ready (calm_forever schema version " .. ns.SCHEMA_VERSION .. ").")
