@@ -1,104 +1,53 @@
-# SavedVariables schema upgrades
+# Supported SavedVariables
 
 ## Summary
 
-The 1.0 release establishes a Calm Forever saved-data lineage. Its first load
-resets plugin preferences to opt-in defaults without discarding user-created data
-or ownership records. Later upgrades preserve preferences unless a migration
-explicitly changes them.
+Completed Calm Forever schema 1 is the oldest supported saved-data baseline.
+Pre-beta conversion is retired. Unsupported or damaged saves remain preserved
+until the user confirms discarding them through the existing recovery page.
+This boundary was approved on 2026-11-11.
 
 ## Behavior
 
-1. `CalmUITweaksDB.calm_forever = true` identifies the new lineage.
-   `schemaVersion = 1` is its first completed schema. The marker and checkpoint
-   are metadata, not preferences; normal preference reset preserves both.
-
-2. Missing `calm_forever` identifies pre-1.0 data, not a current schema with a
-   missing flag. Recognized legacy schema versions 0 through 4 and CVar
-   checkpoints 0/1 are upgraded safely before conversion. Fresh installs use
-   the same v1 baseline without an upgrade notice.
-
-3. On conversion, every known preference returns to its default, including macro
-   names. Every boolean preference is false: macros, bag arrows and all three
-   bag scopes, quest sparkles, cursor fix, LFG labels, chat automation and four
-   spacers. A feature only activates after explicit user action.
-
-4. Conversion preserves actual game macros, account and character macro
-   ownership, saved chat default, chat receipts, spacer geometry, unknown root
-   keys and unknown fields inside live settings. Historical cleanup still deletes
-   explicitly retired feature roots and invalid CVar ledger entries. Existing character layouts
-   still seed missing account layouts on that character's first compatible load.
-   Existing account layouts win. Offline characters are not claimed to be migrated.
-
-5. Still-owned targeting, sparkle and cursor CVars are restored before conversion
-   completes. Only validated recorded baselines are used; later external writes
-   are preserved. No guessed defaults or unrecognized CVars are written.
-   Native cleanup requires login and no combat. Missing APIs and failed writes
-   retain unfinished records across reloads and character changes.
-
-6. The lineage marker and v1 checkpoint are committed together only after cleanup
-   and preference conversion succeed. Pending conversion does not initialize
-   features, edit options or allow setters/reset. A failed data conversion does
-   not commit tentative preference changes. Partial native restores remain
-   durable because native side effects cannot be rolled back.
-
-7. Once the marker is present and v1 is complete, reload, character switches,
-   later events and normal reset do not repeat conversion. User choices made
-   after conversion survive reload. New marked schemas run later ordered steps
-   and checkpoint only successful steps; missing steps do not count as complete.
-
-8. Non-table roots, false or malformed lineage markers, unsupported future
-   schemas, missing marked checkpoints, conflicting legacy metadata, and
-   unsupported character metadata are preserved and block startup before either
-   store is changed. A marked v1 store is never interpreted as legacy schema 1.
-   Character metadata still accepts absent/1 `version`; no separate character
-   lineage counter is introduced.
-
-9. Supported historical steps remain available and immutable for direct upgrades.
-   Legacy CVar checkpoints do not replay completed targeting cleanup. Retired
-   account roots and legacy account version markers are removed by their ordered
-   steps. Retired character `spacers` and `spacerCorners` roots are removed only
-   after the legacy spacer import; other character data remains.
-
-10. Existing nonempty accounts receive one completion notice after login that
-    identifies the Calm Forever v1 baseline and explains that preferences were
-    reset. Fresh/current accounts stay silent. Later same-lineage upgrades use
-    schema-version notices. Pending, failed and unsupported upgrades never
-    announce success; reload and reset do not repeat notices.
-
-11. Normal reset applies the same opt-in preference defaults while preserving
-    metadata, user data, unknown fields and ownership. Still-owned active CVars
-    restore through their existing feature paths. It does not delete macros,
-    modify chat history or rewrite EUI profiles. Native spacer removal owns link
-    cleanup; no separate EUI layout reset is performed. The slash command opens
-    native EUI confirmation and reloads only after a successful confirmed reset.
-    Cancel is inert; combat, active Unlock Mode, incomplete login and unavailable
-    popup/reload APIs reject without resetting. Conditions are rechecked when
-    confirming, and typed `reset confirm` cannot bypass the popup.
-
-12. Options remain discoverable while blocked/pending, but editing is disabled
-    with a native explanation. Shared status reports the reason. Startup resumes
-    once when ready and releases migration subscriptions. Readiness retries use
-    bounded events, not polling, repeating timers or update handlers.
-
-13. Back up SavedVariables before conversion or downgrading. Older releases that
-    do not recognize `calm_forever` cannot enforce downgrade safety. Version
-    numbers in the old lineage must not be manually relabeled as new v1.
-
-14. The 1.0 candidate is prepared and validated locally, then tested in game by
-    the user. No push, release tag, public release or asset upload occurs before
-    that testing and explicit release approval.
-
-### Blocked saved-data recovery
-
-When invalid or unsupported saved data blocks startup, each options page shows
-the reason and a Reset Saved Data button instead of feature controls. Data stays
-unchanged unless the user accepts the EUI confirmation. Cancel allows waiting for
-a compatible build or a future fix. Back up SavedVariables before discarding.
-Confirmation discards the account and current-character addon stores and reloads
-to fresh, default-off settings. This loses preferences, saved chat defaults,
-geometry, ownership, unknown fields and CVar restoration records. It does not
-restore CVars or change actual macros, chat windows, EUI profiles or offline
-character stores. Login, combat, Unlock Mode, blocked state and popup/reload APIs
-are checked before opening and again before discarding. Pending migrations do
-not offer this recovery action. Normal preference reset keeps its existing rules.
+1. A missing or empty account store initializes fresh, with every feature and
+   bag scope off and default macro names. Fresh startup is silent and needs no
+   native CVar access. Invalid character data still blocks fresh account startup.
+2. Nonempty accounts must have literal `calm_forever = true`, an integer
+   `schemaVersion` from 1 through the supported version, and no account `version`
+   or `cvarVersion`. Nonempty unmarked data is unsupported, including historical
+   schema 0..4 and partially completed conversions. It is never upgraded,
+   relabeled or automatically discarded.
+3. Unsupported account or character data blocks all feature startup and setting
+   edits before either store is changed or native CVars are read. The existing
+   recovery page explains the reason and offers Reset Saved Data. Cancel retains
+   both stores for backup, a compatible build or a later fix. Newer schemas also
+   remain preserved; they are not assumed corrupt.
+4. Confirmed recovery discards account and current-character addon data and
+   reloads to fresh settings. It loses preferences, saved chat, geometry,
+   ownership, unknown fields and CVar restoration records. Actual macros, chat
+   windows, EUI profiles, current console values and offline character stores
+   are unchanged. Login, combat, Unlock Mode, API availability and blocked state
+   are rechecked before opening and before confirming. Repeated callbacks reload
+   only once. Normal preference reset remains a separate operation.
+5. Current supported saves retain choices across reload and character switches:
+   enabled preferences, names, ownership, saved chat and receipts, account spacer
+   geometry, current CVar ledgers, and unknown root/nested fields. Missing or
+   malformed known preference leaves keep the existing normalization rules.
+6. Historical character spacer geometry is no longer imported or pruned. Existing
+   account geometry remains authoritative. Inert old character `spacers` and
+   `spacerCorners` fields remain untouched like unknown data; they do not block
+   an otherwise supported account. Character metadata remains absent/1 `version`
+   and no `schemaVersion`. A missing character store initializes normally.
+7. No historical targeting, quest-graphics or cursor restoration runs for
+   unsupported saves. Discarding old ledgers cannot recover past native values;
+   users needing that cleanup must use a compatible older build and backup.
+   Current quest/cursor enable, disable and normal-reset ownership restoration
+   continue to work and preserve later external changes.
+8. Future same-lineage upgrades remain ordered and checkpoint only successful
+   steps. Native cleanup waits for login, combat end and required APIs; partial
+   progress survives reload. Pending work blocks feature startup without data
+   loss or success notices. Completed upgrades resume startup once and release
+   migration events. Fresh/current accounts do not announce an upgrade.
+9. Schema 1 keeps its existing meaning and number. Removing pre-beta support does
+   not reset current users or introduce a new lineage. Release versions remain
+   independent of schema versions. Downgrades require compatible backups.

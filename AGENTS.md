@@ -100,11 +100,11 @@ explicit user instruction, follow the user instruction.
   ownership. Do not silently delete saved data or reset user preferences during
   a cleanup.
 - Saved-data changes follow `specs/saved-variables/PRODUCT.md` and `TECH.md`.
-  Preserve immutable legacy steps 1..4 and their CVar 0/1 adoption. The one-time
-  Calm Forever bridge commits literal `calm_forever = true` with schema 1 only
-  after owned-CVar cleanup and known preference-leaf reset. Marked reloads must
-  preserve later choices; normal reset must retain unknown live nested fields.
-  Append later schema steps; never stamp a checkpoint before its work completes.
+  Completed Calm Forever schema 1 is the oldest supported baseline. Do not
+  restore pre-beta conversion or character-layout imports. Preserve unsupported
+  stores until confirmed recovery. Current marked reloads preserve choices;
+  normal reset retains unknown live nested fields. Append future same-lineage
+  schema steps and checkpoint only after their work completes.
 
 ## Repository layout and validation
 

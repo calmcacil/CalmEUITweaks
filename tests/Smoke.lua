@@ -94,6 +94,7 @@ Check(ns.modules.questLootSparkles ~= nil, "Quest loot sparkles must remain avai
 
 -- WoW loads this addon's saved data immediately before ADDON_LOADED.
 CalmUITweaksDB = {
+    calm_forever = true, schemaVersion = 1,
     mageMacro = { enabled = false },
     whatsTraining = { enabled = true },
     anchorGap = { enabled = true, top = 2 },
@@ -108,11 +109,11 @@ CalmUITweaksCharDB = {
 Fire("ADDON_LOADED", "CalmEUITweaks")
 Check(ns.initialized and not ns.ready, "Startup ran gameplay before login")
 Check(ns.db.mageMacro.enabled == false, "Saved false preference overwritten")
-Check(ns.db.whatsTraining == nil and ns.db.anchorGap == nil and ns.db.spacerCorners == nil,
-    "Retired account settings survived schema cleanup")
+Check(ns.db.whatsTraining.enabled and ns.db.anchorGap.top == 2 and ns.db.spacerCorners.player == "TOPLEFT",
+    "Old account fields must stay inert and preserved")
 Check(ns.db.unrecognized.keep == true, "Unrecognized account settings were removed")
-Check(ns.charDB.spacerCorners == nil and ns.charDB.retiredKey == true,
-    "Retired character roots were removed or unrecognized keys were lost")
+Check(ns.charDB.spacerCorners.player.base == -10 and ns.charDB.retiredKey == true,
+    "Unknown character fields were lost")
 loggedIn = true
 Fire("PLAYER_LOGIN")
 Flush()

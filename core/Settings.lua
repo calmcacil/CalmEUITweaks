@@ -55,16 +55,6 @@ end
 function ns.NormalizeSettings(account, character)
     FillDefaults(account, ns.defaults)
     FillDefaults(character, characterDefaults)
-    -- The first loaded character seeds missing account layouts; later characters cannot overwrite them.
-    local legacy = character.spacers
-    if type(legacy) == "table" then
-        for index = 1, 4 do
-            if account.spacerLayouts[index] == nil and type(legacy[index]) == "table" then
-                account.spacerLayouts[index] = Copy(legacy[index])
-            end
-        end
-    end
-    for _, key in ipairs({ "spacers", "spacerCorners" }) do character[key] = nil end
     for key, value in pairs(ns.defaults) do
         if type(value) == "table" and type(value.name) == "string"
             and not IsValidMacroName(account[key].name) then
