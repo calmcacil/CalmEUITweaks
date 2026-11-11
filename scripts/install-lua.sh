@@ -3,19 +3,23 @@ set -euo pipefail
 if command -v lua5.1 >/dev/null 2>&1 && command -v luac5.1 >/dev/null 2>&1; then
     exit 0
 fi
-: "${RUNNER_TEMP:?This installer is for GitHub-hosted Ubuntu x64 runners}"
+: "${RUNNER_TEMP:?This installer is for GitHub-hosted Linux runners}"
 : "${GITHUB_PATH:?GITHUB_PATH is required}"
-[[ $(uname -sm) == 'Linux x86_64' ]] || { echo 'error: expected Linux x64' >&2; exit 1; }
-# Download directly to avoid apt mirror selection and metadata refresh failures.
-checksum=0d4d3678caf1dfa3f201d35203388da5e5aa393b153aec03c1e474f8cf6a476c
-archive="$RUNNER_TEMP/lua5.1_5.1.5-9build2_amd64.deb"
+# Build MIT-licensed Lua 5.1.5 without Ubuntu mirrors or readline dependencies.
+revision=d2e7e7d4d43ff9068b279a617c5b2ca2c2771676
+checksum=155ae33fa6867ce087200f429895855c261bbd202ec18f76db659c95548d5e40
+archive="$RUNNER_TEMP/lua-5.1.5.tar.gz"
 root="$RUNNER_TEMP/calm-ci/lua"
+bin="$RUNNER_TEMP/calm-ci/bin"
 curl --fail --silent --show-error --location --retry 3 \
-    'https://archive.ubuntu.com/ubuntu/pool/universe/l/lua5.1/lua5.1_5.1.5-9build2_amd64.deb' \
+    "https://codeload.github.com/LuaDist/lua/tar.gz/${revision}" \
     --output "$archive"
 printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check
-mkdir -p "$root"
-dpkg-deb --extract "$archive" "$root"
-"$root/usr/bin/lua5.1" -v
-"$root/usr/bin/luac5.1" -v
-echo "$root/usr/bin" >> "$GITHUB_PATH"
+mkdir -p "$root" "$bin"
+tar -xzf "$archive" --strip-components=1 -C "$root"
+make -C "$root/src" generic
+cp "$root/src/lua" "$bin/lua5.1"
+cp "$root/src/luac" "$bin/luac5.1"
+"$bin/lua5.1" -v
+"$bin/luac5.1" -v
+echo "$bin" >> "$GITHUB_PATH"
