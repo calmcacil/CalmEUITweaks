@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/calmcacil/CalmEUITweaks/compare/v1.0.0...v1.0.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **settings:** offer confirmed recovery for blocked saved data ([#39](https://github.com/calmcacil/CalmEUITweaks/issues/39)) ([404a5d9](https://github.com/calmcacil/CalmEUITweaks/commit/404a5d995c7267fc0f0c4421fc90fb02a87ae6ca))
+
 ## [1.0.0](https://github.com/calmcacil/CalmEUITweaks/compare/v0.8.0...v1.0.0) (2026-10-22)
 
 
