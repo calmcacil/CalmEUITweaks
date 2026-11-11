@@ -33,7 +33,7 @@ jobs:
       - name: Run repository checks
         run: bash scripts/check.sh
       - name: Build dry-run package
-        uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0 # v2.6.1
+        uses: BigWigsMods/packager@01e8631a69c69d7654c788d152630d5fed9e3812 # v2.7.0
         with:
           pandoc: 'false'
           args: -d -g forever -n "CalmEUITweaks-{project-version}"
