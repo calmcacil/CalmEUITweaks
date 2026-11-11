@@ -17,9 +17,12 @@ curl --fail --silent --show-error --location --retry 3 \
 printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check
 mkdir -p "$root" "$bin"
 tar -xzf "$archive" --strip-components=1 -C "$root"
-make -C "$root/src" generic
-cp "$root/src/lua" "$bin/lua5.1"
-cp "$root/src/luac" "$bin/luac5.1"
+cmake -S "$root" -B "$root/build" -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DLUA_USE_READLINE=OFF -DLUA_USE_CURSES=OFF \
+    -DLUA_USE_RELATIVE_LOADLIB=OFF
+cmake --build "$root/build" --target lua luac --parallel 2
+ln -sf "$root/build/lua" "$bin/lua5.1"
+ln -sf "$root/build/luac" "$bin/luac5.1"
 "$bin/lua5.1" -v
 "$bin/luac5.1" -v
 echo "$bin" >> "$GITHUB_PATH"

@@ -32,8 +32,8 @@ CI runs validation and package creation in one Required job to avoid extra runne
 startup and aggregation overhead. Actionlint uses the pinned upstream 1.7.12
 Linux x64 binary, verified against a committed SHA-256 digest; no Go toolchain or
 source compilation is needed. ShellCheck and Python come from the hosted runner.
-Lua is installed only when missing, using the checksum-verified Linux x64
-Ubuntu package downloaded directly instead of apt mirror selection. Package snapshots are rebuilt
+Lua is built only when missing, using a checksum-verified, commit-pinned
+MIT-licensed Lua 5.1.5 archive from GitHub, without Ubuntu mirror dependencies. Package snapshots are rebuilt
 for every change to verify the actual installable ZIP. Already compressed ZIP
 artifacts are uploaded without another compression pass. Pandoc is disabled
 because GitHub-only publication does not need markup conversion for WoWInterface.
