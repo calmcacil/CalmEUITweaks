@@ -3,7 +3,7 @@ local statusLabels = setmetatable({}, { __mode = "k" })
 local refreshing = false
 local failures = setmetatable({}, { __mode = "k" })
 local ownedError
-local dependencies = { simpleItemLevel = "EllesmereUIBags" }
+local dependencies = { simpleItemLevel = "EllesmereUIBags", totalRP3Skin = "totalRP3" }
 
 local function Failed(owner, err)
     failures[owner] = true
@@ -206,6 +206,16 @@ local function BuildPage(page, parent, y)
             Scope("bank", "Bank",
                 "Show upgrade arrows in bank bags when bag upgrade arrows are enabled."))
         Text(nil, function() return "Bag upgrade arrows: " .. ns.GetStatus("simpleItemLevel") end)
+        Spacer()
+        Section("COMPATIBILITY")
+        local trpSkin = DependencyToggle("totalRP3Skin", "Total RP 3 EUI Skin",
+            "Matches supported Total RP 3 windows and controls to EUI. Optional and off by default. Changes require /reload; EUI's CalmEUITweaks third-party skin switch must also be enabled.")
+        trpSkin.disabled = function()
+            return not DependencyLoaded("totalRP3Skin") or type(eui.RegisterSkin) ~= "function"
+        end
+        trpSkin.disabledTooltip = "Requires loaded Total RP 3 and an EUI version with the skinning API."
+        Row(trpSkin)
+        Text(nil, function() return "Total RP 3: " .. ns.GetStatus("totalRP3Skin") end, 60)
     elseif page == "Macro" then
         -- General macros first, then class sections in alphabetical order.
         Section("GENERAL")

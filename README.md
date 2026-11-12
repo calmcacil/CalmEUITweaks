@@ -252,6 +252,28 @@ The `simpleItemLevel` preference key and the three scope switches remain
 unchanged. Disabling removes owned arrows; protected changes wait until combat
 ends.
 
+## Total RP 3 compatibility skin
+
+Under General > Compatibility, **Total RP 3 EUI Skin** applies EUI's theme to
+supported Total RP 3 interface chrome. TRP3 is optional: its switch is greyed
+out when TRP3 is not loaded or EUI's skinning API is unavailable. The account
+preference defaults off. Enable it, keep **CalmEUITweaks** enabled in EUI's
+third-party skin options, then `/reload`. Disabling or resetting also requires
+reload to restore existing frames; no automatic reload occurs on this switch.
+
+Player-authored profile formatting, artwork and meaningful RP colors remain
+TRP3's responsibility. This feature does not change profiles, communications,
+nameplates, tooltip anchors or saved window positions. Shared Blizzard menus
+and popups retain their native styling. TRP3 extensions are not included.
+See the [coverage record](specs/total-rp3-skin/COVERAGE.md) for the exact surfaces,
+exceptions and verification state. A partial-coverage status must not be read
+as a fully verified skin. Before EUI supplies the skin callback, status directs
+you to check its third-party switch rather than guessing whether EUI disabled it.
+
+The development baseline is TRP3 3.5.5 on Forever 1.60.1.70888. In-game visual,
+interaction and performance acceptance is pending; mocked tests do not prove
+those properties. Do not combine competing skins for the same TRP3 surface.
+
 ## Commands and saved settings
 
 ```text
@@ -288,9 +310,10 @@ tests do not replace verification in WoW. Before changing saved data, follow the
 [schema step-authoring guide](specs/saved-variables/TECH.md). Native console changes
 also follow the [CVar cleanup guide](specs/cvar-migrations/TECH.md).
 
-Main's version metadata is **0.8.0** while the **1.0.0 candidate** is prepared
-for user testing. It is not publication approval. Complete the in-game checklist
-in [SPEC.md](SPEC.md) before requesting release approval; do not hand-edit versions.
+Release Please maintains version metadata; do not hand-edit versions. Stable
+publication requires the in-game checklist in [SPEC.md](SPEC.md) and explicit
+approval. Authorized alpha prereleases may be shared for testing with outstanding
+in-game checks documented in their notes.
 Download published installable ZIPs from
 [GitHub Releases](https://github.com/calmcacil/CalmEUITweaks/releases).
 See [CI and releases](docs/CI_RELEASES.md) for automated checks, versioning,

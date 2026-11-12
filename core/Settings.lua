@@ -9,6 +9,7 @@ ns.defaults = {
     questLootSparkles = { enabled = false },
     cursorWashedOut = { enabled = false },
     lfgLeaderLocation = { enabled = false },
+    totalRP3Skin = { enabled = false },
     chat = { autoApply = false },
     spacers = { spacer1 = false, spacer2 = false, spacer3 = false, spacer4 = false },
     spacerLayouts = {},
