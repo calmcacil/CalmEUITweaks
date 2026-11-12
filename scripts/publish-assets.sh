@@ -6,6 +6,10 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 : "${RELEASE_TAG:?RELEASE_TAG is required}"
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
+: "${RELEASE_ID:?RELEASE_ID is required}"
+
+release=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease,publishedAt,id)
+python3 scripts/release_version.py "$RELEASE_TAG" --identity "$RELEASE_ID" <<< "$release"
 
 archive_name="CalmEUITweaks-${RELEASE_TAG}.zip"
 archive=".release/$archive_name"

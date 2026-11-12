@@ -4,6 +4,8 @@
   "packages": {
     ".": {
       "release-type": "simple",
+      "versioning": "prerelease",
+      "prerelease": false,
       "version-file": "VERSION",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,

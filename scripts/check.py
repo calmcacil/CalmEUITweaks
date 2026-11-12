@@ -7,6 +7,8 @@ from pathlib import Path, PurePosixPath
 import re
 import zipfile
 
+from release_version import valid_version
+
 ROOT = Path(os.environ.get("CALM_RELEASE_SOURCE_ROOT", Path(__file__).resolve().parent.parent)).resolve()
 ADDON = "CalmEUITweaks"
 FONT_EXTENSIONS = {".ttf", ".otf", ".ttc", ".woff", ".woff2"}
@@ -38,7 +40,7 @@ def check_source():
             require(directory.suffix.lower() not in FONT_EXTENSIONS,
                     f"Font asset in source: {directory.name}")
     version = (ROOT / "VERSION").read_text().strip()
-    require(re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version), "VERSION must be X.Y.Z")
+    require(valid_version(version), "VERSION must be X.Y.Z or X.Y.Z-alpha.N")
     manifest = json.loads((ROOT / ".release-please-manifest.json").read_text())
     require(manifest["."] == version, "Release manifest and VERSION differ")
     text = (ROOT / f"{ADDON}.toc").read_text()

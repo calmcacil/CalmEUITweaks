@@ -46,18 +46,17 @@ are manual: workflows stay on 24.04 until a newer image and the pinned actionlin
 support are verified together. Ubuntu 26.04 jobs currently run, but actionlint 1.7.12 rejects their
 runner label. Do not suppress workflow lint to accept an automatic OS upgrade.
 
-Main metadata is 0.8.0; 0.2.0 was the historical consolidated testing baseline,
-not the current version. The 1.0.0 candidate stays local until the user completes
-the [in-game checklist](../SPEC.md#in-game-candidate-checklist) and explicitly
-approves publication. No push, release tag, public release or asset upload before
-that approval. Release Please keeps breaking changes below 1.0 until stability
-is explicitly declared.
+The version in VERSION, the Release Please manifest and the TOC must agree.
+Release Please maintains those files and CHANGELOG.md together; do not hand-bump
+individual version files. Saved-data lineage/schema metadata is independent of
+release versions. Review the generated version and release channel before
+merging a release PR: merging starts publication.
 
-Only AFTER testing and publication approval, put `Release-As: 1.0.0` in the commit
-body of a reviewed change. Inspect the resulting release PR before merging it;
-merging starts publication, not another testing phase. Do not hand-bump VERSION,
-the release manifest, TOC or CHANGELOG.md: Release Please maintains them together.
-Saved-data lineage/schema metadata is independent of release versions.
+Stable publication requires the [in-game checklist](../SPEC.md#in-game-candidate-checklist)
+and explicit publication approval. An explicitly authorized alpha can be shared
+for testing with outstanding in-game verification documented in its release
+notes; it must not claim stable readiness. Alpha support in the publisher does
+not itself authorize creating a tag, release or upload.
 
 ## GitHub App setup
 
@@ -74,8 +73,7 @@ contents: write. The App token lets its release event trigger the publisher.
 
 After user testing and explicit publication approval:
 
-1. Merge the reviewed Conventional Commit changes to main, with the approved
-   `Release-As: 1.0.0` body trailer for the stable transition.
+1. Merge the reviewed Conventional Commit changes to main.
 2. Review and merge the Release Please PR.
 3. Release Please creates the version tag and GitHub Release.
 4. Publish release verifies the published release before checking out its exact
@@ -89,6 +87,71 @@ The ZIP installs as CalmEUITweaks/, matching the GitHub repository and TOC name.
 The package targets Forever interface 16001, requires EllesmereUI, and excludes
 tests and development helpers. Metadata uses flavor forever. No external addon
 hosting credentials are needed for GitHub publication.
+
+### Alpha testing releases
+
+The source validator and trusted publisher accept `X.Y.Z-alpha.N` versions and
+`vX.Y.Z-alpha.N` tags, where N is a nonnegative integer without leading zeroes.
+Stable tags must point to stable GitHub Releases; alpha tags must have GitHub's
+prerelease flag enabled. Both channels require published, non-draft releases.
+The publisher verifies release identity and channel before checkout and again
+before uploading assets. An alpha must not be selected as the latest stable
+release. The stable coordinator excludes prereleases from its change baseline.
+
+Release creation remains managed by Release Please. Run the Release workflow
+from main with channel `alpha` to create or update the release PR for alpha
+testing. Inspect the generated VERSION, manifest, TOC and changelog together.
+The initial suffix is `alpha.1`; subsequent alpha releases increment the suffix
+through Release Please. The numeric version follows conventional commits and
+the released baseline; inspect the proposed version rather than assuming a
+particular next release. Do not manually stamp versions or relabel an existing
+stable release. A pending stable release PR is updated for the requested channel;
+do not merge it before the intended channel/version is visible and CI passes.
+
+The workflow separates creation of releases from creation of release PRs.
+Release creation always selects the channel from the merged manifest; a manual
+channel request changes only the next release PR. This prevents a stable
+promotion request from publishing a still-alpha version as stable. Normal push
+runs and channel `automatic` preserve the current manifest's channel. There is
+one serialized Release Please PR stream for main, rather than concurrent stable
+and alpha version branches.
+
+After alpha testing and explicit stable publication approval, run Release on
+main with channel `stable`. Review and merge the generated promotion PR. The
+configured prerelease versioning strategy removes the prerelease suffix for
+promotion; both configs retain the same version-file and changelog settings.
+Normal stable development keeps stable versions. Neither starting an alpha nor
+promoting it uploads assets until the reviewed release PR is merged and Release
+Please creates its tagged release.
+
+Configuration follows the upstream [manifest guide](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)
+and [versioning strategies](https://github.com/googleapis/release-please/blob/main/docs/customizing.md).
+The manifest key is `versioning: prerelease`, with `prerelease: true` and
+`prerelease-type: alpha.1` for alpha, and `prerelease: false` for stable.
+When changing these options or the pinned Release Please action, run
+`node scripts/check-release-contract.cjs <release-please-module-directory>`
+against the dependency version in that action's package-lock.json. This optional
+contract check uses the real manifest parser and versioning strategy to verify
+stable feature/fix/breaking bumps, alpha numbering and suffix removal during
+promotion. The current pinned action locks release-please 17.6.0; install it in
+a temporary directory with npm lifecycle scripts disabled. It is not an addon
+runtime dependency and does not need to be installed for ordinary Lua checks.
+
+Release tooling changes must reach main before they can be used for publication.
+The release source commit must also be an ancestor of main. Feature-branch tags
+are not supported by the trusted publisher. Prepare and review changes through
+the normal PR/check process before creating the alpha release.
+
+Before alpha publication, run source/regression checks, build the exact package,
+validate it with `bash scripts/check-package.sh <archive> <version>`, and record
+the covered surfaces, known limitations and unavailable game checks. Download
+the final assets and verify checksums after publication. Alpha publication is a
+testing milestone; stable promotion still requires completed in-game acceptance
+and explicit stable publication approval.
+
+For testing before an alpha is published, the Required CI job
+uploads an installable `calmuitweaks-package-snapshot` artifact for seven days.
+This artifact is not a GitHub prerelease and has no public version-channel claim.
 
 The historical 0.2.0 bootstrap applied only when no release existed. The current
 coordinator still waits for a published baseline before creating automatic bumps;

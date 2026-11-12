@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Published release tag to recover, for example v0.2.0
+        description: Published stable or alpha release tag to recover
         required: true
         type: string
 
@@ -28,6 +28,7 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       commit: ${{ steps.source.outputs.commit }}
+      release_id: ${{ steps.release.outputs.release_id }}
     env:
       GH_TOKEN: ${{ github.token }}
       GITHUB_OAUTH: ${{ github.token }}
@@ -45,13 +46,10 @@ jobs:
           EVENT_RELEASE_ID: ${{ github.event.release.node_id }}
         run: |
           set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo '::error::Expected a vX.Y.Z tag.'; exit 1; }
-          release=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,publishedAt,id)
-          jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == false and .publishedAt != null' <<< "$release" >/dev/null
-          if [[ -n "$EVENT_RELEASE_ID" ]]; then
-            [[ "$(jq -r .id <<< "$release")" == "$EVENT_RELEASE_ID" ]] || { echo '::error::Release identity changed.'; exit 1; }
-          fi
+          release=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease,publishedAt,id)
+          python3 .automation/scripts/release_version.py "$RELEASE_TAG" --identity "$EVENT_RELEASE_ID" <<< "$release"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "release_id=$(jq -r .id <<< "$release")" >> "$GITHUB_OUTPUT"
       - name: Check out released source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -112,6 +110,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.build.outputs.tag }}
+      RELEASE_ID: ${{ needs.build.outputs.release_id }}
       CALM_RELEASE_SOURCE_ROOT: ${{ github.workspace }}/release-source
     steps:
       - name: Check out trusted publishing tools

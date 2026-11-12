@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel for the release pull request; automatic preserves the current channel
+        type: choice
+        options: [automatic, stable, alpha]
+        default: automatic
 
 permissions:
   contents: read
@@ -43,7 +49,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          baseline=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --exclude-drafts --json tagName --jq '.[0].tagName // empty')
+          baseline=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[0].tagName // empty')
           if [[ -z "$baseline" ]]; then
             echo 'eligible=false' >> "$GITHUB_OUTPUT"
             echo 'No published baseline. Publish the prepared initial release before automatic version bumps.' >> "$GITHUB_STEP_SUMMARY"
@@ -56,6 +62,11 @@ jobs:
             echo 'eligible=false' >> "$GITHUB_OUTPUT"
             echo 'No addon changes since the latest release; no release PR is needed.' >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Select release and pull request channels
+        id: channels
+        env:
+          REQUESTED_CHANNEL: ${{ inputs.channel || 'automatic' }}
+        run: python3 scripts/release_version.py --select-channels "$REQUESTED_CHANNEL" >> "$GITHUB_OUTPUT"
       - name: Create release GitHub App token
         if: steps.eligibility.outputs.eligible == 'true' && steps.configuration.outputs.configured == 'true'
         id: app-token
@@ -67,10 +78,19 @@ jobs:
           repositories: CalmEUITweaks
           permission-contents: write
           permission-pull-requests: write
+      - name: Create releases from merged release pull requests
+        if: steps.eligibility.outputs.eligible == 'true' && steps.configuration.outputs.configured == 'true'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: ${{ steps.channels.outputs.release_config }}
+          manifest-file: .release-please-manifest.json
+          skip-github-pull-request: true
       - name: Create or update the release pull request
         if: steps.eligibility.outputs.eligible == 'true' && steps.configuration.outputs.configured == 'true'
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ steps.app-token.outputs.token }}
-          config-file: release-please-config.json
+          config-file: ${{ steps.channels.outputs.pr_config }}
           manifest-file: .release-please-manifest.json
+          skip-github-release: true
