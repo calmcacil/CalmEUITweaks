@@ -6,7 +6,7 @@
 ## Version: 1.0.1
 # x-release-please-end
 ## RequiredDeps: EllesmereUI
-## OptionalDeps: EllesmereUIBags
+## OptionalDeps: EllesmereUIBags, totalRP3
 ## SavedVariables: CalmUITweaksDB
 ## SavedVariablesPerCharacter: CalmUITweaksCharDB
 
@@ -26,6 +26,8 @@ functions\BagItemLevel.lua
 functions\QuestLootSparkles.lua
 functions\CursorWashedOut.lua
 functions\LFGLeaderLocation.lua
+functions\TotalRP3SkinFrames.lua
+functions\TotalRP3Skin.lua
 options\Chat.lua
 options\Pages.lua
 options\EllesmereUI.lua

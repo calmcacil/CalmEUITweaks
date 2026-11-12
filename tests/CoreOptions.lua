@@ -1156,6 +1156,7 @@ local function checkVisiblePages(s)
         ["Cursor washed-out fix"] = { "cursorWashedOut", "enabled" },
         ["Quest loot sparkles"] = { "questLootSparkles", "enabled" },
         ["LFG leader location"] = { "lfgLeaderLocation", "enabled" },
+        ["Total RP 3 EUI Skin"] = { "totalRP3Skin", "enabled" },
         ["Maintain character macro"] = { "mageMacro", "enabled" },
         ["Rebirth / Revive"] = { "druidRebirthMacro", "enabled" },
         ["Self Thorns"] = { "druidThornsMacro", "enabled" },
@@ -1201,7 +1202,7 @@ test("General owns personal tweaks and bag upgrade arrows while other settings h
     local s = optionsFixture():initialize():login()
     local expected = {
         General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix",
-            "Bag upgrade arrows", "Inventory bags", "Reagent bags", "Bank" },
+            "Bag upgrade arrows", "Inventory bags", "Reagent bags", "Bank", "Total RP 3 EUI Skin" },
         Macro = { "General food macro", "Rebirth / Revive", "Self Thorns",
             "Maintain character macro" },
     }
@@ -1586,7 +1587,7 @@ test("missing bag addon greys out its controls without changing preferences", fu
                     contains(cfg.disabledTooltip(), dependency, "disabled tooltip must identify the dependency")
                     equal(cfg.getValue(), true, "greying a control must preserve its saved choice")
                     checked = checked + 1
-                elseif cfg.type == "toggle" then
+                elseif cfg.type == "toggle" and cfg.text ~= "Total RP 3 EUI Skin" then
                     equal(cfg.disabled(), false, "missing bag addon must not disable unrelated features")
                 end
             end
@@ -1596,6 +1597,36 @@ test("missing bag addon greys out its controls without changing preferences", fu
         same(s.ns.charDB, charBefore)
         s:storageUnchanged()
     end
+end)
+
+test("TRP skin stays optional and cached dependency state preserves its preference", function()
+    local s = optionsFixture({ loadedAddons = {}, db = {
+        calm_forever = true, schemaVersion = 1,
+        totalRP3Skin = { enabled = true, future = "keep" },
+    } }):initialize():login()
+    s:build("General")
+    local cfg
+    for _, row in ipairs(s.rows) do
+        if row.left.text == "Total RP 3 EUI Skin" then cfg = row.left end
+    end
+    truth(cfg, "TRP compatibility control is discoverable")
+    truth(cfg.disabled(), "missing optional dependency disables its control")
+    equal(cfg.getValue(), true)
+    contains(cfg.disabledTooltip(), "Total RP 3")
+    local rows, labels, before = #s.rows, #s.labels, copy(s.ns.db)
+    s.loadedAddons.totalRP3 = true
+    truth(cfg.disabled(), "skin API is required too")
+    s.env.EllesmereUI.RegisterSkin = function() end
+    s.ns.OnOptionsAddonLoaded("totalRP3")
+    equal(cfg.disabled(), false)
+    s.pluginRegistration.modules[1].onPageCacheRestore("General")
+    equal(#s.rows, rows)
+    equal(#s.labels, labels)
+    same(s.ns.db, before)
+    s.ns.ResetSettings()
+    equal(cfg.getValue(), false)
+    equal(s.ns.db.totalRP3Skin.future, "keep")
+    s:storageUnchanged()
 end)
 
 test("bag dependency controls wait for a completed load and a usable addon API", function()

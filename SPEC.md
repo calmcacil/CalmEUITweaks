@@ -1,6 +1,6 @@
 # Calm UI Tweaks specification
 
-This document defines the 1.0 candidate behavior and verification requirements.
+This document defines addon behavior and verification requirements.
 User setup instructions are in [README.md](README.md).
 
 ## Scope and integration
@@ -154,6 +154,26 @@ installs and completed cleanup have no cleanup frame subscriptions or polling.
 The existing module status/error boundary reports pending work and failures.
 
 ## Feature contracts
+
+### Total RP 3 compatibility skin
+
+- The approved [product contract](specs/total-rp3-skin/PRODUCT.md) and
+  [technical plan](specs/total-rp3-skin/TECH.md) define comprehensive, safe EUI
+  styling of core TRP3 interface chrome. The [coverage record](specs/total-rp3-skin/COVERAGE.md)
+  distinguishes implemented surfaces, verification gaps and safety exceptions.
+- `totalRP3Skin.enabled` is account-wide and defaults off. TRP3 is optional;
+  General's Compatibility selector is disabled until TRP3 is loaded and EUI's
+  documented skinning API is available. Other features are unaffected.
+- Activation/restoration requires reload; disable prevents new skin operations
+  immediately. EUI's CalmEUITweaks third-party skin switch also governs the skin.
+  Before its callback arrives, status explains that it is waiting and asks the
+  user to check that switch; the published API cannot distinguish initial opt-out.
+- Use documented EUI primitives with explicit TRP3-owned targets. Preserve RP
+  content, semantic colors, layouts, actions, profiles and shared Blizzard UI.
+  No polling, global frame scans or per-frame skin callbacks. Combat and active
+  Unlock Mode defer setup through existing lifecycle/native notifications.
+- Initial research baseline is installed TRP3 3.5.5 and client 1.60.1.70888.
+  In-game coverage, interaction and performance acceptance remains required.
 
 ### Quest loot sparkles
 
@@ -450,5 +470,8 @@ native rendering, CVar restoration or macro execution.
   immediately. Confirm one-time login auto-apply only for a newer default,
   delayed readiness/combat completion and no mid-session automatic overwrite.
 
-Do not push, tag, publish or upload this candidate until testing is complete and
-publication is explicitly approved; follow [CI and releases](docs/CI_RELEASES.md).
+Stable publication requires completed testing and explicit publication approval.
+An explicitly authorized alpha may be pushed and published for testing after
+automated checks, independent review and package validation, with outstanding
+in-game checks stated in its notes. An alpha does not certify stable readiness.
+Follow [CI and releases](docs/CI_RELEASES.md).

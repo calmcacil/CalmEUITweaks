@@ -497,6 +497,7 @@ local booleanPreferences = {
     {"generalFoodWaterMacro", "enabled"}, {"simpleItemLevel", "enabled"},
     {"simpleItemLevel", "inventory"}, {"simpleItemLevel", "reagent"}, {"simpleItemLevel", "bank"},
     {"questLootSparkles", "enabled"}, {"cursorWashedOut", "enabled"}, {"lfgLeaderLocation", "enabled"},
+    {"totalRP3Skin", "enabled"},
     {"chat", "autoApply"}, {"spacers", "spacer1"}, {"spacers", "spacer2"},
     {"spacers", "spacer3"}, {"spacers", "spacer4"},
 }
