@@ -33,6 +33,8 @@ async function main() {
         const manifest = await Manifest.fromManifest(github, "main", configFile);
         const config = manifest.repositoryConfig["."];
         assert.equal(config.prerelease, channel === "alpha");
+        assert.equal(config.draft === true, channel === "alpha");
+        assert.equal(config.forceTag === true, channel === "alpha");
         assert.equal(config.versioning, "prerelease");
         strategies[channel] = buildVersioningStrategy({ github, ...config, type: config.versioning });
     }

@@ -50,7 +50,7 @@ The version in VERSION, the Release Please manifest and the TOC must agree.
 Release Please maintains those files and CHANGELOG.md together; do not hand-bump
 individual version files. Saved-data lineage/schema metadata is independent of
 release versions. Review the generated version and release channel before
-merging a release PR: merging starts publication.
+merging a release PR: merging starts stable publication or creates an alpha draft.
 
 Stable publication requires the [in-game checklist](../SPEC.md#in-game-candidate-checklist)
 and explicit publication approval. An explicitly authorized alpha can be shared
@@ -122,12 +122,36 @@ configured prerelease versioning strategy removes the prerelease suffix for
 promotion; both configs retain the same version-file and changelog settings.
 Normal stable development keeps stable versions. Neither starting an alpha nor
 promoting it uploads assets until the reviewed release PR is merged and Release
-Please creates its tagged release.
+Please creates its tagged release. Alpha releases are drafts first; they do not
+trigger asset publication until their testing notes are reviewed and the draft
+is published as described below.
+
+#### Review and publish the alpha draft
+
+The alpha config sets `draft: true` and `force-tag-creation: true`. Release Please
+creates an immutable tag at the reviewed release commit while leaving the GitHub
+Release unpublished. The tag must remain unchanged. Before publishing the draft:
+
+1. Read back its tag, target commit, draft status and prerelease flag. Verify the
+   tag belongs to main and its version matches the release PR metadata.
+2. Add concrete testing instructions and limitations to the generated notes.
+   Include the tested addon/client versions, how to enable the default-off skin
+   and reload, implemented coverage and exceptions, dependency/conflict behavior,
+   and the exact in-game visual/interaction/combat and CPU/memory checks still
+   pending. Do not describe automated mocks as in-game verification.
+3. Review the complete notes from a local file, then publish with
+   `gh release edit <tag> --notes-file <notes-file> --draft=false --prerelease --latest=false`.
+   This is the public publication action and requires the task's publication
+   authorization. The published event starts the trusted publisher.
+4. Check the publisher run and download/read back all three assets, release
+   notes and prerelease status. Verify checksums and package contents. The
+   alpha must remain excluded from latest stable.
 
 Configuration follows the upstream [manifest guide](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)
 and [versioning strategies](https://github.com/googleapis/release-please/blob/main/docs/customizing.md).
-The manifest key is `versioning: prerelease`, with `prerelease: true` and
-`prerelease-type: alpha.1` for alpha, and `prerelease: false` for stable.
+The manifest key is `versioning: prerelease`, with `prerelease: true`,
+`prerelease-type: alpha.1`, `draft: true` and `force-tag-creation: true` for alpha,
+and `prerelease: false` with normal publication for stable.
 When changing these options or the pinned Release Please action, run
 `node scripts/check-release-contract.cjs <release-please-module-directory>`
 against the dependency version in that action's package-lock.json. This optional

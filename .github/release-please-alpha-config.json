@@ -6,6 +6,8 @@
       "release-type": "simple",
       "versioning": "prerelease",
       "prerelease": true,
+      "draft": true,
+      "force-tag-creation": true,
       "version-file": "VERSION",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,

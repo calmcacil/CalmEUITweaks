@@ -30,10 +30,15 @@ class ReleaseVersionTests(unittest.TestCase):
         alpha = json.loads((root / ".github/release-please-alpha-config.json").read_text())
         self.assertIs(stable["packages"]["."]["prerelease"], False)
         self.assertIs(alpha["packages"]["."]["prerelease"], True)
+        self.assertIs(alpha["packages"]["."]["draft"], True)
+        self.assertIs(alpha["packages"]["."]["force-tag-creation"], True)
+        self.assertNotIn("draft", stable["packages"]["."])
         self.assertEqual(alpha["packages"]["."]["prerelease-type"], "alpha.1")
         self.assertEqual(stable["packages"]["."]["versioning"], "prerelease")
         self.assertEqual(alpha["packages"]["."]["versioning"], "prerelease")
         del alpha["packages"]["."]["prerelease-type"]
+        del alpha["packages"]["."]["draft"]
+        del alpha["packages"]["."]["force-tag-creation"]
         alpha["packages"]["."]["prerelease"] = False
         self.assertEqual(stable, alpha)
 
