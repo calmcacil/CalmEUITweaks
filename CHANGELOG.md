@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-alpha.1](https://github.com/calmcacil/CalmEUITweaks/compare/v1.0.1...v1.1.0-alpha.1) (2026-11-12)
+
+
+### Features
+
+* **trp3:** add optional EUI skin and alpha testing releases ([#42](https://github.com/calmcacil/CalmEUITweaks/issues/42)) ([14293da](https://github.com/calmcacil/CalmEUITweaks/commit/14293da2da3576602b8f6afe9f368e95fe342cab))
+
 ## [1.0.1](https://github.com/calmcacil/CalmEUITweaks/compare/v1.0.0...v1.0.1) (2026-11-11)
 
 
