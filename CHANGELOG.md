@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.1](https://github.com/calmcacil/CalmEUITweaks/compare/v1.1.0...v1.1.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **skins:** bundle RestedXP arrows and skip missing addons ([#48](https://github.com/calmcacil/CalmEUITweaks/issues/48)) ([b61ccae](https://github.com/calmcacil/CalmEUITweaks/commit/b61ccae188c908acfe9608fbb13e4af60d78f56a))
+
+
+### CI
+
+* include skin code and artwork in release eligibility ([#49](https://github.com/calmcacil/CalmEUITweaks/issues/49)) ([d8a844a](https://github.com/calmcacil/CalmEUITweaks/commit/d8a844a1d9d5d4ce69c64486db61f926e82275b4))
+
 ## [1.1.0](https://github.com/calmcacil/CalmEUITweaks/compare/v1.1.0-alpha.1...v1.1.0) (2026-11-23)
 
 
