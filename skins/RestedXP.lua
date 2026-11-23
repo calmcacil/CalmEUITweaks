@@ -1,4 +1,4 @@
-local _, ns = ...
+local addonName, ns = ...
 local key = "restedXPSkin"
 local module = {}
 ns.RegisterModule(key, module)
@@ -9,17 +9,18 @@ local palettes = {
         panel = {0.045, 0.045, 0.045, 0.98}, header = {0.09, 0.09, 0.09, 1},
         border = {0.27, 0.27, 0.27, 1}, accent = {0.83, 0.83, 0.83, 1},
         text = {0.93, 0.93, 0.93, 1}, muted = {0.71, 0.71, 0.71, 1},
+        arrow = "RestedXPArrowTrueDark.tga",
     },
     [forever] = {
         panel = {0.065, 0.052, 0.041, 0.98}, header = {0.12, 0.085, 0.055, 1},
         border = {0.48, 0.32, 0.17, 1}, accent = {0.90, 0.70, 0.42, 1},
         text = {0.93, 0.90, 0.84, 1}, muted = {0.74, 0.67, 0.57, 1},
+        arrow = "RestedXPArrowForever.tga",
     },
 }
 local registered, events, unlockHost, editing
 local offer, fittedWindow
 local checkedName, checkedSize, checkedBottom
-
 local function Loaded(name)
     if not C_AddOns or not C_AddOns.IsAddOnLoaded then return false end
     local available, loaded = C_AddOns.IsAddOnLoaded(name)
@@ -89,6 +90,7 @@ local function Register(rxp, base)
         local theme = ns.Copy(base)
         theme.name, theme.displayName, theme.author = name, name, "Calm UI Tweaks"
         theme.version, theme.applicable = 2, Applicable
+        theme.navigationArrow = "Interface/AddOns/" .. addonName .. "/media/" .. colors.arrow
         theme.headerTexture = {texCoords = {0, 1, 0, 1}}
         theme.backgroundColors = {
             common = colors.panel, guideWindow = colors.panel, guideName = colors.header,
@@ -182,7 +184,7 @@ function module:Confirm(request)
 end
 
 function module:ApplySettings()
-    if not ns.GetSettings(key).enabled then
+    if not ns.GetSettings(key).enabled or not Loaded("RXPGuides") then
         offer = nil
         checkedName = nil
         ReleaseWaits()
@@ -249,7 +251,8 @@ function module:ApplySettings()
 end
 
 function module:OnAddonLoaded(name)
-    if ns.GetSettings(key).enabled and (name == "RXPGuides" or name == "EUISkin_RXP" or name == "EUIAddonSkins") then
+    if ns.GetSettings(key).enabled and Loaded("RXPGuides")
+        and (name == "RXPGuides" or name == "EUISkin_RXP" or name == "EUIAddonSkins") then
         ns.RequestApply(key)
     end
 end

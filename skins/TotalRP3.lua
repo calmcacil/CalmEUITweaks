@@ -33,7 +33,7 @@ end
 local function ReleaseWaits()
     pending = false
     if ns.TotalRP3SkinFrames.ClearPending then ns.TotalRP3SkinFrames.ClearPending() end
-    events:UnregisterAllEvents()
+    if events then events:UnregisterAllEvents() end
     if listenerHost then
         listenerHost:UnregisterUnlockModeListener(addonName .. "_TotalRP3Skin")
         listenerHost = nil
@@ -65,12 +65,12 @@ local function Report(surface, err)
 end
 
 function module:GetStatus()
+    if not Loaded() then return "Disabled" end
     local wanted = ns.GetSettings("totalRP3Skin").enabled
     if requested ~= nil and wanted ~= requested then
         return "Reload required; " .. (wanted and "enable" or "restore native") .. " Total RP 3 styling."
     end
     if not wanted then return "Disabled" end
-    if not Loaded() then return "Waiting for Total RP 3 to be installed, enabled, and loaded." end
     local eui = _G.EllesmereUI
     if not eui or type(eui.RegisterSkin) ~= "function" then return "Waiting for EUI skinning API." end
     if not skin then return "Waiting for EUI skin callback; check CalmEUITweaks in EUI third-party skins." end
@@ -83,7 +83,7 @@ function module:GetStatus()
     return "Active; Total RP 3 uses the EUI theme."
 end
 
-function module:Initialize()
+local function CreateWaitFrame()
     events = CreateFrame("Frame")
     events:SetScript("OnEvent", function()
         events:UnregisterEvent("PLAYER_REGEN_ENABLED")
@@ -130,6 +130,7 @@ function module:ApplySettings()
         if skin and not skin.IsEnabled() then ClearFailures() end
         return
     end
+    if not events then CreateWaitFrame() end
     if not listenerHost and type(eui.RegisterUnlockModeListener) == "function"
         and type(eui.UnregisterUnlockModeListener) == "function" then
         listenerHost = eui
@@ -162,7 +163,8 @@ function module:OnPageOpened(pageId, context)
 end
 
 function module:OnAddonLoaded(name)
-    if requested and (name == "totalRP3" or ns.IsEUIAddon(name)) then
+    if requested and ns.GetSettings("totalRP3Skin").enabled and Loaded()
+        and (name == "totalRP3" or ns.IsEUIAddon(name)) then
         ns.RequestApply("totalRP3Skin")
     end
 end

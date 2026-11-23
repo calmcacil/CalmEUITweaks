@@ -212,7 +212,11 @@ Test("late TRP3 and EUI readiness recover through relevant addon events", functi
     for _, missing in ipairs({ "trp", "api" }) do
         local s = Fixture({ enabled = true, loaded = missing ~= "trp", missingAPI = missing == "api" })
         Check(s.registrations == 0 and s.applications == 0, "Missing dependency must wait")
-        Contains(s:status(), "Waiting")
+        if missing == "trp" then
+            Check(s:status() == "Disabled", "An unloaded target has no notice")
+        else
+            Contains(s:status(), "Waiting")
+        end
         s:load("UnrelatedAddon")
         Check(s.registrations == 0 and #s.timers == 0, "Unrelated addon loads do not schedule skin work")
         if missing == "trp" then s.trpLoaded = true; s:load("totalRP3")
