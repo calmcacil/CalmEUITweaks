@@ -55,7 +55,7 @@ jobs:
             echo 'No published baseline. Publish the prepared initial release before automatic version bumps.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          changes=$(git diff --name-only "$baseline" HEAD -- CalmEUITweaks.toc core functions compatability options macros)
+          changes=$(git diff --name-only "$baseline" HEAD -- CalmEUITweaks.toc core functions compatability options macros skins media)
           if [[ -n "$changes" ]]; then
             echo 'eligible=true' >> "$GITHUB_OUTPUT"
           else
