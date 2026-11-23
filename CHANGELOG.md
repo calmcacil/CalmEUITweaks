@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/calmcacil/CalmEUITweaks/compare/v1.1.0-alpha.1...v1.1.0) (2026-11-23)
+
+
+### Features
+
+* **skins:** add opt-in skins for Forever addons ([#46](https://github.com/calmcacil/CalmEUITweaks/issues/46)) ([c541a22](https://github.com/calmcacil/CalmEUITweaks/commit/c541a22cc4b5500967c0a793a28a7b4a15198463))
+
 ## [1.1.0-alpha.1](https://github.com/calmcacil/CalmEUITweaks/compare/v1.0.1...v1.1.0-alpha.1) (2026-11-12)
 
 
