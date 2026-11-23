@@ -10,6 +10,12 @@ ns.defaults = {
     cursorWashedOut = { enabled = false },
     lfgLeaderLocation = { enabled = false },
     totalRP3Skin = { enabled = false },
+    restedXPSkin = { enabled = false, forever = true, fontSize = 12, bottom = false },
+    auctionatorSkin = { enabled = false },
+    foreverDungeonJournalSkin = { enabled = false },
+    whatsTrainingSkin = { enabled = false },
+    liteMountSkin = { enabled = false },
+    journalatorSkin = { enabled = false },
     chat = { autoApply = false },
     spacers = { spacer1 = false, spacer2 = false, spacer3 = false, spacer4 = false },
     spacerLayouts = {},
@@ -47,6 +53,10 @@ local function IsNamedSetting(moduleKey)
     return type(defaults) == "table" and type(defaults.name) == "string"
 end
 
+local function ValidGuideFontSize(value)
+    return value >= 9 and value <= 18 and value % 1 == 0
+end
+
 function ns.ResetPreferences(db)
     -- Reset preference leaves, not subtrees that also hold user data or ownership.
     FillDefaults(db, ns.defaults, true)
@@ -56,6 +66,9 @@ end
 function ns.NormalizeSettings(account, character)
     FillDefaults(account, ns.defaults)
     FillDefaults(character, characterDefaults)
+    if not ValidGuideFontSize(account.restedXPSkin.fontSize) then
+        account.restedXPSkin.fontSize = ns.defaults.restedXPSkin.fontSize
+    end
     -- The first loaded character seeds missing account layouts; later characters cannot overwrite them.
     local legacy = character.spacers
     if type(legacy) == "table" then
@@ -97,6 +110,9 @@ function ns.SetSetting(moduleKey, key, value)
     local defaults = ns.defaults[moduleKey]
     if type(defaults) ~= "table" or defaults[key] == nil or type(value) ~= type(defaults[key]) then
         return false, "Unknown setting or invalid value."
+    end
+    if moduleKey == "restedXPSkin" and key == "fontSize" and not ValidGuideFontSize(value) then
+        return false, "Choose a whole number from 9 to 18."
     end
     if key == "name" and IsNamedSetting(moduleKey) then
         value = value:gsub("^%s+", ""):gsub("%s+$", "")

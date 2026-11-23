@@ -8,8 +8,8 @@ User setup instructions are in [README.md](README.md).
 The addon targets WoW Forever interface `16001` and requires EllesmereUI.
 Options require plugin API version 1 or later, with callable `RegisterPlugin`
 and `OpenPlugin` functions. Registration creates a bottom section named
-**Calm UI Tweaks**, containing **Calm's Tweaks** and four pages: General,
-Macro, Chat and Spacers.
+**Calm UI Tweaks**, containing **Calm's Tweaks** and five pages: General,
+Skins, Macro, Chat and Spacers.
 
 Settings belong to this addon rather than EUI profiles or conditional overrides.
 Unavailable or rejected plugin APIs disable options and report a status reason;
@@ -60,8 +60,8 @@ The once-only `OnLogin` module callback runs after settings/readiness initialize
 before settings application. Late initial addon loading uses the same callback.
 
 Preference reset assigns known scalar leaves only, repairing malformed known
-tables without replacing valid live subtrees. All boolean preferences become
-false and macro names return to defaults. Metadata, unknown nested/provider fields,
+tables without replacing valid live subtrees. Features are turned off and
+preferences return to defaults. Metadata, unknown nested/provider fields,
 macro ownership, chat default/receipts, spacer geometry and character records
 remain. Actual macros are not deleted; owned CVars restore through feature paths
 and native spacer removal owns link cleanup, without resetting EUI profiles.
@@ -89,7 +89,7 @@ recognized retired account roots (`gatheringSparkles`, `whatsTraining`, `anchorG
 
 The bridge then restores full historical quest graphics and `HardwareCursor`
 ledgers before staging a known preference-leaf reset, including macro names.
-Every boolean is false: all macro providers, bag arrows and inventory/reagent/bank
+Feature switches are false: all macro providers, bag arrows and inventory/reagent/bank
 scopes, quest sparkles, cursor fix, LFG labels, chat automation and four spacers.
 Valid live tables retain unknown nested/provider keys. Account/character macro
 ownership, real macros, chat default/receipts, geometry and unknown root keys
@@ -162,7 +162,7 @@ The existing module status/error boundary reports pending work and failures.
   styling of core TRP3 interface chrome. The [coverage record](specs/total-rp3-skin/COVERAGE.md)
   distinguishes implemented surfaces, verification gaps and safety exceptions.
 - `totalRP3Skin.enabled` is account-wide and defaults off. TRP3 is optional;
-  General's Compatibility selector is disabled until TRP3 is loaded and EUI's
+  The switch on Skins is disabled until TRP3 is loaded and EUI's
   documented skinning API is available. Other features are unaffected.
 - Activation/restoration requires reload; disable prevents new skin operations
   immediately. EUI's CalmEUITweaks third-party skin switch also governs the skin.
@@ -174,6 +174,41 @@ The existing module status/error boundary reports pending work and failures.
   Unlock Mode defer setup through existing lifecycle/native notifications.
 - Initial research baseline is installed TRP3 3.5.5 and client 1.60.1.70888.
   In-game coverage, interaction and performance acceptance remains required.
+
+### RestedXP V2 skins
+
+- The account-wide skin defaults off, with Forever selected, guide font size
+  12 and the current step above the guide. An explicit True Dark selection is
+  preserved. Font size accepts whole numbers from 9 to 18. RestedXP is optional.
+- With opt-in, register distinct themes through the RestedXP 4.11.40 theme
+  registries. Refresh a configured selection if RestedXP cached its fallback
+  at startup. No confirmation or profile write is needed for that refresh.
+- An incomplete setup offers one native EUI confirmation for the current
+  profile and palette. Approval rechecks the request, then sets Beta Features,
+  V2 Interface, theme, guide font size and current-step anchor, calls RestedXP's profile save method and
+  reloads. Declining or disabling leaves the RestedXP profile untouched.
+  Check once per load or reload, and when the user changes CalmUI skin
+  preferences. Native profile switches are checked on the next reload. No polling.
+- Setup waits for combat and active Unlock Mode to end. CalmUI yields to the
+  loaded standalone prototype or globally enabled EUI AddonSkins without
+  changing their settings. Disabling CalmUI leaves prior profile choices intact;
+  the next reload removes its theme registrations.
+- In game, verify confirmation, cancellation, profile persistence, late load,
+  both palettes, disabled live reload, combat and Unlock Mode, and both
+  competing skin configurations.
+
+### Auctionator, Forever Dungeon Journal, LiteMount, What's Training? and Journalator
+
+- Each addon has a separate account-wide skin toggle, off by default. Reload
+  to activate or restore. EUI's third-party skin switch also governs each skin.
+- Style only declared addon-owned roots and supported controls inside them.
+  Leave the shared auction house shell, auction actions, and addon settings alone.
+  Apply on login, relevant addon load, window show, or auction house open.
+  Journalator's main window and CSV dialog are styled after first opening.
+  Defer in combat and Unlock Mode. No polling.
+- Yield while EUI AddonSkins skinning is enabled. Users can disable that
+  collection and enable only the individual skins they want in CalmUI.
+- Verify visual coverage and interactions in game before release.
 
 ### Quest loot sparkles
 
@@ -419,7 +454,7 @@ native rendering, CVar restoration or macro execution.
   macros, chat/history/receipts and geometry remain; owned CVars restore. Run
   `/calmtweaks reset`: Cancel must do nothing; Reset and Reload must reset then
   reload once. Combat or Unlock Mode before/during confirmation must block it.
-- [ ] Open all four pages after searching before their first visit. Check native
+- [ ] Open all pages after searching before their first visit. Check native
   row dividers, left-to-right row packing, blank final slots, wrapped status and
   disabled-state tooltips at different UI scales. Switch cached pages and EUI
   profiles; preferences remain independent. Change status while another EUI

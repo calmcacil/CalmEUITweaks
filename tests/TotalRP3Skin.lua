@@ -141,7 +141,7 @@ local function Fixture(options)
     }
     for _, path in ipairs({
         "core/Bootstrap.lua", "core/Settings.lua", "core/CVars.lua", "core/Migrations.lua",
-        "core/Lifecycle.lua", "functions/TotalRP3Skin.lua",
+        "core/Lifecycle.lua", "skins/TotalRP3.lua",
     }) do
         local chunk = assert(loadfile(root .. path))
         setfenv(chunk, env)

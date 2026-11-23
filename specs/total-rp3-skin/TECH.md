@@ -54,9 +54,9 @@ remains incomplete. This inventory is a delivery requirement, not optional scope
 
 ### Runtime integration
 
-Use `functions/TotalRP3Skin.lua` as the lifecycle module, registered through
+Use `skins/TotalRP3.lua` as the lifecycle module, registered through
 `ns.RegisterModule("totalRP3Skin", module)`. Keep state local. If surface mapping
-requires separation, use a small `functions/TotalRP3SkinFrames.lua` companion
+requires separation, use a small `skins/TotalRP3Frames.lua` companion
 that supplies explicit surface functions to the same module; do not introduce
 a generic skin engine, second module registry or widget discovery framework.
 
@@ -121,7 +121,7 @@ normalization/reset. Inspect source validation and schema fixtures for explicit
 preference inventories and update only current expectations where required.
 Unknown live nested fields and all TRP3 stores remain untouched.
 
-Add General's Compatibility section through existing DualRow patterns, a fresh
+Build the Total RP 3 section on Skins through existing DualRow patterns, a fresh
 BlankRowCfg for a final unused slot, native tooltip and cached live status.
 Preserve hidden search prebuild, page switching and active-module refresh.
 Do not add a new options page or transfer popup. Update SPEC.md and README.md
@@ -179,9 +179,9 @@ owns the branch, shared integration files and final validation.
 1. Sequential prerequisite: orchestrator verifies installed contracts and EUI
    external-frame permission, creates coverage inventory and agrees the small
    lifecycle-to-surface interface before agents edit runtime code.
-2. Surface agent owns functions/TotalRP3SkinFrames.lua and COVERAGE.md, maps
+2. Surface agent owns skins/TotalRP3Frames.lua and COVERAGE.md, maps
    all core surfaces, records exceptions and supplies explicit styling functions.
-3. Lifecycle agent owns functions/TotalRP3Skin.lua and tests/TotalRP3Skin.lua,
+3. Lifecycle agent owns skins/TotalRP3.lua and tests/TotalRP3Skin.lua,
    implements activation/readiness/deferred work against the agreed interface.
    It can work in parallel with the surface agent after the interface is fixed.
 4. Orchestrator owns Settings, TOC, Pages, CoreOptions/schema fixture changes,

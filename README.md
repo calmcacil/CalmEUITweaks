@@ -254,7 +254,7 @@ ends.
 
 ## Total RP 3 compatibility skin
 
-Under General > Compatibility, **Total RP 3 EUI Skin** applies EUI's theme to
+Under Skins > Total RP 3, **Total RP 3 EUI Skin** applies EUI's theme to
 supported Total RP 3 interface chrome. TRP3 is optional: its switch is greyed
 out when TRP3 is not loaded or EUI's skinning API is unavailable. The account
 preference defaults off. Enable it, keep **CalmEUITweaks** enabled in EUI's
@@ -273,6 +273,38 @@ you to check its third-party switch rather than guessing whether EUI disabled it
 The development baseline is TRP3 3.5.5 on Forever 1.60.1.70888. In-game visual,
 interaction and performance acceptance is pending; mocked tests do not prove
 those properties. Do not combine competing skins for the same TRP3 surface.
+
+## RestedXP V2 skins
+
+In Skins > RestedXP, enable **Skin RestedXP**. The skin defaults off, with
+**Forever palette** selected. Turn off the palette switch for neutral True
+Dark charcoal. **Guide font size** defaults to 12 on RestedXP's 9-18 scale.
+Use **Current step below guide** to move the current step from above the guide
+to below it. The header uses compact single-line labels to fit its fixed height,
+and the version text is capped at size 10.
+
+If the current RestedXP profile needs setup, Calm UI Tweaks asks before enabling
+Beta Features and V2 Interface, applying the palette, font and anchor, and reloading. **Not
+Now** leaves the RestedXP profile unchanged. Toggle Skin RestedXP off and on
+to ask again. CalmUI checks the current profile once per load or reload, and
+when you change its skin settings. Turning the feature off stops future setup; reload to remove
+the CalmUI themes from the current session. To go back to your previous
+RestedXP theme or interface settings, change them in RestedXP.
+
+Calm UI Tweaks yields to the standalone EUISkin_RXP prototype and to EUI
+AddonSkins while its skinning is enabled, because both can affect the same
+RestedXP frames. Turn off the competing skinning and reload if you want to
+use CalmUI's themes. CalmUI does not change either addon's settings.
+
+## Other addon skins
+
+In **Skins > Other Addons**, enable **Auctionator**, **Forever Dungeon
+Journal**, **LiteMount**, **What's Training?**, or **Journalator** independently,
+then reload.
+These switches style supported windows and controls through EUI. Keep the
+corresponding entry enabled in EUI's third-party skin settings. If you use
+EUI AddonSkins, turn off its skinning first and reload so both skins do not
+style the same frames.
 
 ## Commands and saved settings
 
