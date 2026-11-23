@@ -51,6 +51,8 @@ prefs.enabled = true
 loaded.RXPGuides = false
 module:ApplySettings()
 assert(not popup and not next(legacy))
+module:OnAddonLoaded("EUIAddonSkins")
+assert(not queued and ns.GetStatus("restedXPSkin") == "Disabled.")
 loaded.RXPGuides, loaded.EUISkin_RXP = true, true
 module:ApplySettings()
 assert(not popup and not next(legacy))

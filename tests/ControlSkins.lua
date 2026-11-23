@@ -44,6 +44,14 @@ auction:OnLogin()
 mount:OnLogin()
 mount:ApplySettings()
 assert(not next(registered) and not next(calls))
+loaded.Auctionator = nil
+auction:ApplySettings()
+auction:OnAddonLoaded("Blizzard_Settings")
+assert(ns.GetStatus("auctionatorSkin") == "Disabled." and ns.db.auctionatorSkin.enabled)
+assert(not next(registered) and not next(queued) and not next(events))
+loaded.Auctionator = true
+auction:OnAddonLoaded("Auctionator")
+assert(queued.auctionatorSkin)
 loaded.EUIAddonSkins = true
 auction:ApplySettings()
 assert(not next(registered))

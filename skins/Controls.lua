@@ -52,9 +52,9 @@ function ns.RegisterControlSkin(key, addon, label, roots, usesAuctionHouse, jour
         local wanted = ns.GetSettings(key).enabled
         local eui = EllesmereUI
         local reason
-        if requested ~= wanted then reason = wanted and "Reload to enable." or "Reload to disable."
+        if not Loaded(addon) then reason = "Disabled."
+        elseif requested ~= wanted then reason = wanted and "Reload to enable." or "Reload to disable."
         elseif not wanted then reason = "Disabled."
-        elseif not Loaded(addon) then reason = "Waiting for " .. label .. " to load."
         elseif Loaded("EUIAddonSkins") and not (type(EUIAddonSkinsDB) == "table" and EUIAddonSkinsDB.disabled) then
             reason = "Turn off EUI AddonSkins skinning and reload."
         elseif type(eui.RegisterSkin) ~= "function" then reason = "EUI skinning API unavailable."
@@ -137,7 +137,7 @@ function ns.RegisterControlSkin(key, addon, label, roots, usesAuctionHouse, jour
     end
 
     function module:OnAddonLoaded(name)
-        if requested and ns.GetSettings(key).enabled
+        if requested and ns.GetSettings(key).enabled and Loaded(addon)
             and (name == addon or name == "EUIAddonSkins" or name == "Blizzard_Settings" or name == journalDisplay) then
             ns.RequestApply(key)
         end

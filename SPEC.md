@@ -155,6 +155,9 @@ The existing module status/error boundary reports pending work and failures.
 
 ## Feature contracts
 
+Skins stay quiet until their target addon has loaded. Saved opt-ins are
+preserved, and the target's completed load can activate its skin later.
+
 ### Total RP 3 compatibility skin
 
 - The approved [product contract](specs/total-rp3-skin/PRODUCT.md) and
@@ -183,6 +186,8 @@ The existing module status/error boundary reports pending work and failures.
 - With opt-in, register distinct themes through the RestedXP 4.11.40 theme
   registries. Refresh a configured selection if RestedXP cached its fallback
   at startup. No confirmation or profile write is needed for that refresh.
+- Use the bundled waypoint arrow artwork for each CalmUI palette. RestedXP
+  still controls positioning, rotation, visibility and navigation text.
 - An incomplete setup offers one native EUI confirmation for the current
   profile and palette. Approval rechecks the request, then sets Beta Features,
   V2 Interface, theme, guide font size and current-step anchor, calls RestedXP's profile save method and
