@@ -51,7 +51,7 @@ local function Sandbox()
         if err then s.errors[#s.errors + 1] = { surface, err }
         else s.recovered = (s.recovered or 0) + 1 end
     end
-    local chunk = assert(loadfile(root .. "functions/TotalRP3SkinFrames.lua"))
+    local chunk = assert(loadfile(root .. "skins/TotalRP3Frames.lua"))
     setfenv(chunk, env)
     chunk("CalmEUITweaks", s.ns)
     function s:apply() return self.ns.TotalRP3SkinFrames.Apply(self.skin, self.allowed, self.report) end

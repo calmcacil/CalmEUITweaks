@@ -5,6 +5,18 @@ local failures = setmetatable({}, { __mode = "k" })
 local ownedError
 local dependencies = { simpleItemLevel = "EllesmereUIBags", totalRP3Skin = "totalRP3" }
 
+local function SkinNotices(skins)
+    local notices = {}
+    for _, entry in ipairs(skins) do
+        local status = ns.GetStatus(entry[1])
+        if status ~= "Disabled" and status ~= "Disabled." and status ~= "Waiting for login."
+            and status ~= "Open the addon's window." and not status:match("^Active[.;]") then
+            notices[#notices + 1] = entry[2] .. ": " .. status
+        end
+    end
+    return table.concat(notices, "\n")
+end
+
 local function Failed(owner, err)
     failures[owner] = true
     ns.ReportError("options", err, true)
@@ -206,8 +218,8 @@ local function BuildPage(page, parent, y)
             Scope("bank", "Bank",
                 "Show upgrade arrows in bank bags when bag upgrade arrows are enabled."))
         Text(nil, function() return "Bag upgrade arrows: " .. ns.GetStatus("simpleItemLevel") end)
-        Spacer()
-        Section("COMPATIBILITY")
+    elseif page == "Skins" then
+        Section("TOTAL RP 3")
         local trpSkin = DependencyToggle("totalRP3Skin", "Total RP 3 EUI Skin",
             "Matches supported Total RP 3 windows and controls to EUI. Optional and off by default. Changes require /reload; EUI's CalmEUITweaks third-party skin switch must also be enabled.")
         trpSkin.disabled = function()
@@ -215,7 +227,38 @@ local function BuildPage(page, parent, y)
         end
         trpSkin.disabledTooltip = "Requires loaded Total RP 3 and an EUI version with the skinning API."
         Row(trpSkin)
-        Text(nil, function() return "Total RP 3: " .. ns.GetStatus("totalRP3Skin") end, 60)
+        Spacer()
+        Section("RESTEDXP")
+        local rxpSkin = Toggle("restedXPSkin", "enabled", "Skin RestedXP",
+            "Offer to set up the RestedXP V2 skin for the current profile. Off by default.")
+        local rxpPalette = Toggle("restedXPSkin", "forever", "Forever palette",
+            "On: warm panels and bronze borders. Off: True Dark with neutral charcoal panels.")
+        rxpPalette.disabled = function() return not ns.GetSettings("restedXPSkin").enabled end
+        rxpPalette.disabledTooltip = "Enable Skin RestedXP to choose a palette."
+        Row(rxpSkin, rxpPalette)
+        Row({
+            type = "slider", text = "Guide font size", min = 9, max = 18, step = 1, noCapture = true,
+            getValue = function() return ns.GetSettings("restedXPSkin").fontSize end,
+            setValue = function(value) ns.SetSetting("restedXPSkin", "fontSize", value) end,
+            disabled = function() return not ns.GetSettings("restedXPSkin").enabled end,
+            disabledTooltip = "Enable Skin RestedXP to set the guide font size.",
+        }, Toggle("restedXPSkin", "bottom", "Current step below guide",
+            "On: place the current step below the guide. Off: place it above."))
+        Spacer()
+        Section("OTHER ADDONS")
+        local function SkinToggle(key, label)
+            return Toggle(key, "enabled", label, "Style this addon's supported controls with EUI. Reload to apply or restore.")
+        end
+        Row(SkinToggle("auctionatorSkin", "Auctionator"), SkinToggle("foreverDungeonJournalSkin", "Forever Dungeon Journal"))
+        Row(SkinToggle("liteMountSkin", "LiteMount"), SkinToggle("whatsTrainingSkin", "What's Training?"))
+        Row(SkinToggle("journalatorSkin", "Journalator"))
+        local skins = {
+            {"totalRP3Skin", "Total RP 3"}, {"restedXPSkin", "RestedXP"},
+            {"auctionatorSkin", "Auctionator"}, {"foreverDungeonJournalSkin", "Forever Dungeon Journal"},
+            {"liteMountSkin", "LiteMount"}, {"whatsTrainingSkin", "What's Training?"},
+            {"journalatorSkin", "Journalator"},
+        }
+        Text(nil, function() return SkinNotices(skins) end, 100)
     elseif page == "Macro" then
         -- General macros first, then class sections in alphabetical order.
         Section("GENERAL")

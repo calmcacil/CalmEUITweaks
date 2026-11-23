@@ -9,7 +9,7 @@ local function Install()
         key = moduleKey,
         title = "Calm's Tweaks",
         description = "Personal conveniences and third-party compatibility fixes.",
-        pages = { "General", "Macro", "Chat", "Spacers" },
+        pages = { "General", "Skins", "Macro", "Chat", "Spacers" },
         buildPage = ns.BuildOptionsPage,
         onPageCacheRestore = ns.RefreshOptions,
     }

@@ -85,7 +85,8 @@ toc:close()
 Check(ns.db == nil and CalmUITweaksDB == nil, "Settings initialized before SavedVariables load")
 Check(ns.optionsInstalled, "Plugin options registration failed")
 Check(pluginRegistration.modules[1].key == "Tweaks", "Plugin module missing")
-Check(#pluginRegistration.modules[1].pages == 4, "Expected the four supported options pages")
+Check(table.concat(pluginRegistration.modules[1].pages, ",") == "General,Skins,Macro,Chat,Spacers",
+    "Expected the five supported options pages")
 Check(type(ns.RegisterMacroProvider) == "function", "Shared macro registry missing")
 Check(ns.modules.chat == ns.Chat, "Chat preset module missing")
 Check(ns.modules.gatheringSparkles == nil and ns.defaults.gatheringSparkles == nil,
@@ -124,7 +125,8 @@ Check(ns.db.calm_forever == true and ns.db.schemaVersion == 1, "Forever baseline
 for key, defaults in pairs(ns.defaults) do
     for preference, value in pairs(defaults) do
         if type(value) == "boolean" then
-            Check(value == false and ns.db[key][preference] == false, "Plugin toggles must all default off")
+            local expected = key == "restedXPSkin" and preference == "forever"
+            Check(value == expected and ns.db[key][preference] == expected, "Unexpected preference default")
         end
     end
 end

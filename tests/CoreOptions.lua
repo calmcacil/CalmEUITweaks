@@ -394,6 +394,8 @@ test("every plugin toggle is opt in on fresh install and reset", function()
         for key, value in pairs(defaults) do
             if type(value) == "table" then
                 checkDefaults(value, settings[key])
+            elseif defaults == s.ns.defaults.restedXPSkin and key == "forever" then
+                equal(settings[key], true, "Forever palette is the default for the opt-in skin")
             elseif type(value) == "boolean" then
                 equal(value, false, "boolean preference default must be off")
                 equal(settings[key], false, "fresh/reset preference must be off")
@@ -1157,6 +1159,14 @@ local function checkVisiblePages(s)
         ["Quest loot sparkles"] = { "questLootSparkles", "enabled" },
         ["LFG leader location"] = { "lfgLeaderLocation", "enabled" },
         ["Total RP 3 EUI Skin"] = { "totalRP3Skin", "enabled" },
+        ["Skin RestedXP"] = { "restedXPSkin", "enabled" },
+        ["Forever palette"] = { "restedXPSkin", "forever" },
+        ["Current step below guide"] = { "restedXPSkin", "bottom" },
+        ["Auctionator"] = { "auctionatorSkin", "enabled" },
+        ["Forever Dungeon Journal"] = { "foreverDungeonJournalSkin", "enabled" },
+        ["LiteMount"] = { "liteMountSkin", "enabled" },
+        ["Journalator"] = { "journalatorSkin", "enabled" },
+        ["What's Training?"] = { "whatsTrainingSkin", "enabled" },
         ["Maintain character macro"] = { "mageMacro", "enabled" },
         ["Rebirth / Revive"] = { "druidRebirthMacro", "enabled" },
         ["Self Thorns"] = { "druidThornsMacro", "enabled" },
@@ -1184,6 +1194,16 @@ local function checkVisiblePages(s)
                 equal(cfg.getValue(), not value)
                 same(s.ns.db, expected, "widget must change only its own setting")
                 cfg.setValue(value)
+            elseif cfg.type == "slider" then
+                equal(cfg.noCapture, true)
+                equal(cfg.text, "Guide font size")
+                local value = cfg.getValue()
+                local expected = copy(s.ns.db)
+                expected.restedXPSkin.fontSize = 13
+                cfg.setValue(13)
+                equal(cfg.getValue(), 13)
+                same(s.ns.db, expected, "slider must change only guide font size")
+                cfg.setValue(value)
             elseif cfg.type == "button" then
                 equal(cfg.noCapture, true)
                 equal(type(cfg.onClick), "function")
@@ -1202,7 +1222,9 @@ test("General owns personal tweaks and bag upgrade arrows while other settings h
     local s = optionsFixture():initialize():login()
     local expected = {
         General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix",
-            "Bag upgrade arrows", "Inventory bags", "Reagent bags", "Bank", "Total RP 3 EUI Skin" },
+            "Bag upgrade arrows", "Inventory bags", "Reagent bags", "Bank" },
+        Skins = { "Total RP 3 EUI Skin", "Skin RestedXP", "Forever palette", "Current step below guide",
+            "Auctionator", "Forever Dungeon Journal", "LiteMount", "What's Training?", "Journalator" },
         Macro = { "General food macro", "Rebirth / Revive", "Self Thorns",
             "Maintain character macro" },
     }
@@ -1295,7 +1317,7 @@ test("unsupported schema disables options and rejects slash reset without changi
     local s = optionsFixture({db = db}):initialize():login()
     local before = copy(db)
     for _, page in ipairs(s.pluginRegistration.modules[1].pages) do s:build(page) end
-    equal(#s.rows, 4, "Every blocked page offers only recovery")
+    equal(#s.rows, #s.pluginRegistration.modules[1].pages, "Every blocked page offers only recovery")
     for _, row in ipairs(s.rows) do
         equal(row.left.text, "Reset Saved Data")
         equal(row.left.disabled(), false)
@@ -1587,7 +1609,7 @@ test("missing bag addon greys out its controls without changing preferences", fu
                     contains(cfg.disabledTooltip(), dependency, "disabled tooltip must identify the dependency")
                     equal(cfg.getValue(), true, "greying a control must preserve its saved choice")
                     checked = checked + 1
-                elseif cfg.type == "toggle" and cfg.text ~= "Total RP 3 EUI Skin" then
+                elseif cfg.type == "toggle" then
                     equal(cfg.disabled(), false, "missing bag addon must not disable unrelated features")
                 end
             end
@@ -1604,7 +1626,7 @@ test("TRP skin stays optional and cached dependency state preserves its preferen
         calm_forever = true, schemaVersion = 1,
         totalRP3Skin = { enabled = true, future = "keep" },
     } }):initialize():login()
-    s:build("General")
+    s:build("Skins")
     local cfg
     for _, row in ipairs(s.rows) do
         if row.left.text == "Total RP 3 EUI Skin" then cfg = row.left end
@@ -1619,7 +1641,7 @@ test("TRP skin stays optional and cached dependency state preserves its preferen
     s.env.EllesmereUI.RegisterSkin = function() end
     s.ns.OnOptionsAddonLoaded("totalRP3")
     equal(cfg.disabled(), false)
-    s.pluginRegistration.modules[1].onPageCacheRestore("General")
+    s.pluginRegistration.modules[1].onPageCacheRestore("Skins")
     equal(#s.rows, rows)
     equal(#s.labels, labels)
     same(s.ns.db, before)

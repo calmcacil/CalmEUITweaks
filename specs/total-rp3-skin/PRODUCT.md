@@ -22,7 +22,7 @@ do not invent a separate Calm theme or assume a fixed accent or dark palette.
    Existing installations retain every unrelated preference. Enabling requests
    the complete supported skin; there are no separate switches per widget.
 
-2. **Activation.** The switch appears on General under a Compatibility section,
+2. **Activation.** The switch appears on Skins under a Total RP 3 section,
    following native EUI row, search, tooltip, and disabled-state conventions.
    Missing TRP3 or an unavailable EUI skinning API disables the control with a
    useful dependency explanation, without erasing the saved preference.

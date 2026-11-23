@@ -6,7 +6,7 @@
 ## Version: 1.1.0-alpha.1
 # x-release-please-end
 ## RequiredDeps: EllesmereUI
-## OptionalDeps: EllesmereUIBags, totalRP3
+## OptionalDeps: EllesmereUIBags, totalRP3, RXPGuides, EUISkin_RXP, EUIAddonSkins
 ## SavedVariables: CalmUITweaksDB
 ## SavedVariablesPerCharacter: CalmUITweaksCharDB
 
@@ -26,8 +26,15 @@ functions\BagItemLevel.lua
 functions\QuestLootSparkles.lua
 functions\CursorWashedOut.lua
 functions\LFGLeaderLocation.lua
-functions\TotalRP3SkinFrames.lua
-functions\TotalRP3Skin.lua
+skins\TotalRP3Frames.lua
+skins\TotalRP3.lua
+skins\RestedXP.lua
+skins\Controls.lua
+skins\Auctionator.lua
+skins\ForeverDungeonJournal.lua
+skins\WhatsTraining.lua
+skins\LiteMount.lua
+skins\Journalator.lua
 options\Chat.lua
 options\Pages.lua
 options\EllesmereUI.lua
