@@ -11,6 +11,7 @@ ns.defaults = {
     lfgLeaderLocation = { enabled = false },
     totalRP3Skin = { enabled = false },
     restedXPSkin = { enabled = false, forever = true, fontSize = 12, bottom = false },
+    restedXPQuiet = { enabled = false },
     auctionatorSkin = { enabled = false },
     foreverDungeonJournalSkin = { enabled = false },
     whatsTrainingSkin = { enabled = false },

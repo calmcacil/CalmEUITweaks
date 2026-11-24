@@ -1160,6 +1160,7 @@ local function checkVisiblePages(s)
         ["LFG leader location"] = { "lfgLeaderLocation", "enabled" },
         ["Total RP 3 EUI Skin"] = { "totalRP3Skin", "enabled" },
         ["Skin RestedXP"] = { "restedXPSkin", "enabled" },
+        ["Shut up, RXP!"] = { "restedXPQuiet", "enabled" },
         ["Forever palette"] = { "restedXPSkin", "forever" },
         ["Current step below guide"] = { "restedXPSkin", "bottom" },
         ["Auctionator"] = { "auctionatorSkin", "enabled" },
@@ -1223,7 +1224,7 @@ test("General owns personal tweaks and bag upgrade arrows while other settings h
     local expected = {
         General = { "Quest loot sparkles", "LFG leader location", "Cursor washed-out fix",
             "Bag upgrade arrows", "Inventory bags", "Reagent bags", "Bank" },
-        Skins = { "Total RP 3 EUI Skin", "Skin RestedXP", "Forever palette", "Current step below guide",
+        Skins = { "Total RP 3 EUI Skin", "Skin RestedXP", "Forever palette", "Current step below guide", "Shut up, RXP!",
             "Auctionator", "Forever Dungeon Journal", "LiteMount", "What's Training?", "Journalator" },
         Macro = { "General food macro", "Rebirth / Revive", "Self Thorns",
             "Maintain character macro" },

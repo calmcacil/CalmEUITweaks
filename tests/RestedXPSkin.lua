@@ -102,4 +102,21 @@ assert(offers == 3)
 prefs.enabled = false
 popup.onConfirm()
 assert(saved == 1 and reloaded == 1 and settings.profile.activeTheme == "Default")
+local quiet = ns.modules.restedXPQuiet
+local announcements = settings.profile
+announcements.enableLevelUpAnnounceGroup = true
+announcements.enableCompleteStepAnnouncements = true
+announcements.enableCollectStepAnnouncements = false
+announcements.enableFlyStepAnnouncements = true
+announcements.enableLevelUpAnnounceGuild = true
+settings.SaveLocalProfile = function() saved = saved + 1 end
+quiet:ApplySettings()
+assert(announcements.enableFlyStepAnnouncements and saved == 1)
+ns.db.restedXPQuiet.enabled = true
+quiet:ApplySettings()
+assert(announcements.enableLevelUpAnnounceGroup == false and announcements.enableCompleteStepAnnouncements == false)
+assert(announcements.enableCollectStepAnnouncements == false and announcements.enableFlyStepAnnouncements == false)
+assert(announcements.enableLevelUpAnnounceGuild and saved == 2 and reloaded == 1)
+quiet:ApplySettings()
+assert(saved == 2)
 print("RestedXP setup tests passed")

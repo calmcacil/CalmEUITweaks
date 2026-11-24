@@ -42,6 +42,40 @@ local function GetRXP()
     return ace and ace:GetAddon("RXPGuides", true)
 end
 
+local quiet = {}
+ns.RegisterModule("restedXPQuiet", quiet)
+local partyAnnouncements = {
+    "enableLevelUpAnnounceGroup", "enableCompleteStepAnnouncements",
+    "enableCollectStepAnnouncements", "enableFlyStepAnnouncements",
+}
+
+function quiet:ApplySettings()
+    if not ns.GetSettings("restedXPQuiet").enabled then return end
+    local rxp = GetRXP()
+    local settings = rxp and rxp.settings
+    local profile = settings and settings.profile
+    if not profile or type(settings.SaveLocalProfile) ~= "function" then return end
+    local changed = {}
+    for _, key in ipairs(partyAnnouncements) do
+        if profile[key] == true then
+            profile[key] = false
+            changed[#changed + 1] = key
+        end
+    end
+    if #changed == 0 then return end
+    local ok, err = pcall(settings.SaveLocalProfile, settings)
+    if not ok then
+        for _, key in ipairs(changed) do profile[key] = true end
+        error(err)
+    end
+end
+
+function quiet:OnAddonLoaded(name)
+    if name == "RXPGuides" and ns.GetSettings("restedXPQuiet").enabled then
+        ns.RequestApply("restedXPQuiet")
+    end
+end
+
 local function Selected()
     return ns.GetSettings(key).forever and forever or dark
 end
