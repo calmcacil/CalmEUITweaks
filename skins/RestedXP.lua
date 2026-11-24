@@ -70,6 +70,32 @@ local function FitGuideWindow(rxp)
     local function Fit()
         if not ns.GetSettings(key).enabled or Conflict() or not rxp.activeTheme
             or not palettes[rxp.activeTheme.name] or InCombatLockdown() or Editing() then return end
+        local dark = rxp.themes and rxp.themes.DarkMode
+        local close = window.closebutton
+        if close then
+            local glyph = "Interface/AddOns/" .. addonName .. "/media/RestedXPClose.tga"
+            close:SetNormalTexture(glyph)
+            close:SetPushedTexture(glyph)
+            close:SetHighlightTexture(glyph, "ADD")
+            close:GetHighlightTexture():SetAlpha(0.25)
+        end
+        local class = rxp.player and rxp.player.class
+        if dark and dark.texturePath and class and window.classIcon then
+            window.classIcon:SetTexture(dark.texturePath .. class)
+        end
+        local steps = window.guideSteps
+        local bar = steps and steps.scroll and steps.scroll.scrollbar
+        if bar then
+            local colors = palettes[rxp.activeTheme.name]
+            for _, texture in pairs({
+                bar.ThumbTexture,
+                bar.ScrollUpButton and bar.ScrollUpButton.Normal,
+                bar.ScrollDownButton and bar.ScrollDownButton.Normal,
+            }) do
+                texture:SetDesaturated(true)
+                texture:SetVertexColor(unpack(colors.muted))
+            end
+        end
         -- The native V2 header reserves a fixed height for both lines.
         window.title:SetMaxLines(1)
         window.subtitle:SetMaxLines(1)
@@ -90,6 +116,12 @@ local function Register(rxp, base)
         local theme = ns.Copy(base)
         theme.name, theme.displayName, theme.author = name, name, "Calm UI Tweaks"
         theme.version, theme.applicable = 2, Applicable
+        local darkMode = rxp.v2.themes.DarkMode
+        if darkMode and darkMode.guideWindow then
+            for _, icon in ipairs({"logo", "settingsIcon", "guideSelectIcon"}) do
+                theme.guideWindow[icon] = darkMode.guideWindow[icon] or theme.guideWindow[icon]
+            end
+        end
         theme.navigationArrow = "Interface/AddOns/" .. addonName .. "/media/" .. colors.arrow
         theme.headerTexture = {texCoords = {0, 1, 0, 1}}
         theme.backgroundColors = {

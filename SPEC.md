@@ -188,6 +188,9 @@ preserved, and the target's completed load can activate its skin later.
   at startup. No confirmation or profile write is needed for that refresh.
 - Use the bundled waypoint arrow artwork for each CalmUI palette. RestedXP
   still controls positioning, rotation, visibility and navigation text.
+- Reuse the installed DarkMode guide header icons and class badge when
+  available. Tint the guide scrollbar to match the selected palette.
+- Use a muted close glyph while preserving the native close action.
 - An incomplete setup offers one native EUI confirmation for the current
   profile and palette. Approval rechecks the request, then sets Beta Features,
   V2 Interface, theme, guide font size and current-step anchor, calls RestedXP's profile save method and
