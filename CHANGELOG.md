@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/calmcacil/CalmEUITweaks/compare/v1.1.1...v1.1.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **skins:** match RestedXP guide controls to dark theme ([#51](https://github.com/calmcacil/CalmEUITweaks/issues/51)) ([8592424](https://github.com/calmcacil/CalmEUITweaks/commit/859242416fd357f312e18c5ccf86f85a236b443b))
+
 ## [1.1.1](https://github.com/calmcacil/CalmEUITweaks/compare/v1.1.0...v1.1.1) (2026-11-23)
 
 
