@@ -296,10 +296,13 @@ AddonSkins while its skinning is enabled, because both can affect the same
 RestedXP frames. Turn off the competing skinning and reload if you want to
 use CalmUI's themes. CalmUI does not change either addon's settings.
 
-**Shut up, RXP!** in **Skins > RestedXP** turns off party announcements for
-level-ups, step completion, item collection and flight timers. It works
+**Shut up, RXP!** in **Skins > RestedXP** turns off level-up announcements
+in party chat, guild chat and emotes, plus party announcements for step
+completion, item collection and flight timers. It also turns off the Questie
+override in the Announcements section. It works
 independently of the skin and applies to the active RestedXP profile on enable
-and login or reload. Guild chat, emotes and addon coordination remain unchanged.
+and login or reload. Changes take effect immediately and are reported in local
+chat. Addon coordination remains unchanged.
 Turning the toggle off stops future changes; re-enable announcements in RestedXP.
 
 ## Other addon skins

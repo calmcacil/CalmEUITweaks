@@ -44,9 +44,14 @@ end
 
 local quiet = {}
 ns.RegisterModule("restedXPQuiet", quiet)
-local partyAnnouncements = {
-    "enableLevelUpAnnounceGroup", "enableCompleteStepAnnouncements",
-    "enableCollectStepAnnouncements", "enableFlyStepAnnouncements",
+local announcements = {
+    {"enableLevelUpAnnounceGroup", "Announce Level Ups (Party Chat)"},
+    {"enableLevelUpAnnounceGuild", "Announce Level Ups (Guild Chat)"},
+    {"enableLevelUpAnnounceSolo", "Announce Level Ups (Emote)"},
+    {"enableCompleteStepAnnouncements", "Announce Step completion"},
+    {"enableCollectStepAnnouncements", "Announce Step collection"},
+    {"enableFlyStepAnnouncements", "Announce Step flying timers"},
+    {"ignoreQuestieConflicts", "Ignore Questie announcements"},
 }
 
 function quiet:ApplySettings()
@@ -56,17 +61,25 @@ function quiet:ApplySettings()
     local profile = settings and settings.profile
     if not profile or type(settings.SaveLocalProfile) ~= "function" then return end
     local changed = {}
-    for _, key in ipairs(partyAnnouncements) do
+    for _, option in ipairs(announcements) do
+        local key = option[1]
         if profile[key] == true then
             profile[key] = false
-            changed[#changed + 1] = key
+            changed[#changed + 1] = option
         end
     end
     if #changed == 0 then return end
     local ok, err = pcall(settings.SaveLocalProfile, settings)
     if not ok then
-        for _, key in ipairs(changed) do profile[key] = true end
+        for _, option in ipairs(changed) do profile[option[1]] = true end
         error(err)
+    end
+    for _, option in ipairs(changed) do
+        ns.Print("Shut up, RXP! " .. option[2] .. " set to disabled.")
+    end
+    local registry = LibStub("AceConfigRegistry-3.0", true)
+    if registry and type(registry.NotifyChange) == "function" and rxp.title then
+        registry:NotifyChange(rxp.title)
     end
 end
 

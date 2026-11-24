@@ -245,7 +245,7 @@ local function BuildPage(page, parent, y)
         }, Toggle("restedXPSkin", "bottom", "Current step below guide",
             "On: place the current step below the guide. Off: place it above."))
         Row(Toggle("restedXPQuiet", "enabled", "Shut up, RXP!",
-            "Turns off RestedXP party chat announcements now and on login or reload. Turning this off leaves those announcements off; re-enable them in RestedXP."))
+            "Turns off every switch in RestedXP's Announcements section immediately. Checks again on login or reload. Re-enable announcements in RestedXP after turning this off."))
         Spacer()
         Section("OTHER ADDONS")
         local function SkinToggle(key, label)
