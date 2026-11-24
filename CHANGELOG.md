@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/calmcacil/CalmEUITweaks/compare/v1.1.2...v1.2.0) (2026-11-24)
+
+
+### Features
+
+* **restedxp:** add Shut up, RXP! announcement toggle ([#53](https://github.com/calmcacil/CalmEUITweaks/issues/53)) ([a5c38c4](https://github.com/calmcacil/CalmEUITweaks/commit/a5c38c4963e03d48bccf02c83e2e35e9c7c0a252))
+
 ## [1.1.2](https://github.com/calmcacil/CalmEUITweaks/compare/v1.1.1...v1.1.2) (2026-11-24)
 
 
