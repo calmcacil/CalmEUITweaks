@@ -244,6 +244,8 @@ local function BuildPage(page, parent, y)
             disabledTooltip = "Enable Skin RestedXP to set the guide font size.",
         }, Toggle("restedXPSkin", "bottom", "Current step below guide",
             "On: place the current step below the guide. Off: place it above."))
+        Row(Toggle("restedXPQuiet", "enabled", "Shut up, RXP!",
+            "Turns off every switch in RestedXP's Announcements section immediately. Checks again on login or reload. Re-enable announcements in RestedXP after turning this off."))
         Spacer()
         Section("OTHER ADDONS")
         local function SkinToggle(key, label)

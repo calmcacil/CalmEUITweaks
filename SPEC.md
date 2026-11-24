@@ -180,6 +180,15 @@ preserved, and the target's completed load can activate its skin later.
 
 ### RestedXP V2 skins
 
+- The default-off account-wide Shut up, RXP! toggle works without the skin.
+  On enable, login, or late RestedXP load, turn off enabled level-up
+  announcements in party chat, guild chat and emotes, plus party chat
+  announcements for completion, collection and flight timers, plus the Questie
+  override in the Announcements section even when hidden. Save through
+  RestedXP only when a setting changes and report each change in local chat.
+  No reload or polling. Disabling stops future writes; it does not restore
+  announcements. Addon coordination settings are untouched.
+
 - The account-wide skin defaults off, with Forever selected, guide font size
   12 and the current step above the guide. An explicit True Dark selection is
   preserved. Font size accepts whole numbers from 9 to 18. RestedXP is optional.

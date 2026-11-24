@@ -102,4 +102,40 @@ assert(offers == 3)
 prefs.enabled = false
 popup.onConfirm()
 assert(saved == 1 and reloaded == 1 and settings.profile.activeTheme == "Default")
+local quiet = ns.modules.restedXPQuiet
+local announcements = settings.profile
+announcements.enableLevelUpAnnounceGroup = true
+announcements.enableCompleteStepAnnouncements = true
+announcements.enableCollectStepAnnouncements = false
+announcements.enableFlyStepAnnouncements = true
+announcements.enableLevelUpAnnounceGuild = true
+announcements.enableLevelUpAnnounceSolo = true
+announcements.ignoreQuestieConflicts = true
+settings.SaveLocalProfile = function() saved = saved + 1 end
+quiet:ApplySettings()
+assert(announcements.enableFlyStepAnnouncements and saved == 1)
+local refreshed = 0
+rxp.title = "RestedXP Guides"
+local getAddon = LibStub
+LibStub = function(name)
+    if name == "AceConfigRegistry-3.0" then
+        return {NotifyChange = function(_, title)
+            assert(title == rxp.title and announcements.enableFlyStepAnnouncements == false)
+            refreshed = refreshed + 1
+        end}
+    end
+    return getAddon()
+end
+ns.ready, ns.settingsReady = true, true
+local messages = {}
+ns.Print = function(message) messages[#messages + 1] = message end
+assert(ns.SetSetting("restedXPQuiet", "enabled", true))
+assert(announcements.enableLevelUpAnnounceGroup == false and announcements.enableCompleteStepAnnouncements == false)
+assert(announcements.enableCollectStepAnnouncements == false and announcements.enableFlyStepAnnouncements == false)
+assert(announcements.enableLevelUpAnnounceGuild == false and announcements.enableLevelUpAnnounceSolo == false)
+assert(announcements.ignoreQuestieConflicts == false)
+assert(saved == 2 and reloaded == 1 and #messages == 6)
+assert(messages[2] == "Shut up, RXP! Announce Level Ups (Guild Chat) set to disabled.")
+quiet:ApplySettings()
+assert(saved == 2 and refreshed == 1 and #messages == 6)
 print("RestedXP setup tests passed")
